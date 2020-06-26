@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from numpy.core import multiarray as mu
 from numpy.core import umath as um
+from itertools import product
+from thomas.core import CPT
 
 from diffprivlib.tools.histograms import histogram as diffprivlib_hist
 
@@ -17,32 +19,17 @@ from diffprivlib.utils import PrivacyLeakWarning
 
 def contingency_table(X):
     """Represent data as contingency table of all attributes"""
-    #todo can we do this faster using pd_crosstab or the old privbayes method? -> check nan bins
-    for col in X.columns:
-        X[col] = X[col].astype("object")
-
+    # X is normally categorical, convert everything to string to prevent indexing issues
+    X = X.astype(str)
     columns = list(X.columns)
 
-    contingency_table_ = X.fillna('nan').groupby(columns).size().astype(float)
-    contingency_table_ = _add_zerocount_bins(contingency_table_)
+    counts = X.fillna('nan').groupby(columns).size().astype(float)
 
+    # get variable combinations that do not occur in the data and set count to 0
+    full_space_index = pd.MultiIndex.from_tuples(tuple(product(*counts.index.levels)),
+                                                 names=counts.index.names)
+    contingency_table_ = pd.Series(data=0, index=full_space_index).combine(counts, max)
     return contingency_table_
-
-
-def _add_zerocount_bins(counts):
-    """Adds combinations of attributes that do not exist in the input data"""
-    nlevels = counts.index.nlevels - 1
-    stack = counts
-
-    # unstack to get nan's in pd.Dataframe
-    for _ in range(nlevels):
-        stack = stack.unstack()
-    # add count of 0 to non-existing combinations
-    stack = stack.fillna(0)
-    # reverse stack back to a pd.Series
-    for _ in range(nlevels):
-        stack = stack.stack()
-    return stack
 
 def joint_distribution(X):
     """Get joint distribution by normalizing contingency table"""
@@ -52,8 +39,48 @@ def joint_distribution(X):
     return joint_distribution_
 
 
+def normalize_cpt(cpt, dropna=False):
+    """normalization of cpt with option to fill missing values with uniform distribution"""
+    if dropna or not cpt.conditioning:
+        return cpt.normalize()
 
-
+    # fill missing combinations with uniform distribution
+    try:
+        cpt_norm_full = cpt._data / cpt.unstack().sum(axis=1)
+    except:
+        print(cpt)
+        print(';')
+    uniform_prob = 1 / len(cpt.variable_states[cpt.conditioned[-1]])
+    cpt_norm_full = cpt_norm_full.fillna(uniform_prob)
+    return CPT(cpt_norm_full)
+# def contingency_table(X):
+#     """Represent data as contingency table of all attributes"""
+#     #todo can we do this faster using pd_crosstab or the old privbayes method? -> check nan bins
+#     for col in X.columns:
+#         X[col] = X[col].astype("object")
+#
+#     columns = list(X.columns)
+#
+#     contingency_table_ = X.fillna('nan').groupby(columns).size().astype(float)
+#     contingency_table_ = _add_zerocount_bins(contingency_table_)
+#
+#     return contingency_table_
+#
+#
+# def _add_zerocount_bins(counts):
+#     """Adds combinations of attributes that do not exist in the input data"""
+#     nlevels = counts.index.nlevels - 1
+#     stack = counts
+#
+#     # unstack to get nan's in pd.Dataframe
+#     for _ in range(nlevels):
+#         stack = stack.unstack()
+#     # add count of 0 to non-existing combinations
+#     stack = stack.fillna(0)
+#     # reverse stack back to a pd.Series
+#     for _ in range(nlevels):
+#         stack = stack.stack()
+#     return stack
 
 
 

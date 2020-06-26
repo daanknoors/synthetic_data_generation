@@ -18,11 +18,11 @@ import synthesis.tools.utils as utils
 
 
 def dp_contingency_table(X, epsilon=1.0, range=None):
-    """Represent data as contingency table of all attributes"""
-    if range is None:
-        warnings.warn("Range parameter has not been specified. Falling back to taking range from the data.\n"
-                      "To ensure differential privacy, and no additional privacy leakage, the range must be "
-                      "specified independently of the data (i.e., using domain knowledge).", PrivacyLeakWarning)
+    """Represent data as a differentiall private contingency table of all attributes"""
+    # if range is None:
+    #     warnings.warn("Range parameter has not been specified. Falling back to taking range from the data.\n"
+    #                   "To ensure differential privacy, and no additional privacy leakage, the range must be "
+    #                   "specified independently of the data (i.e., using domain knowledge).", PrivacyLeakWarning)
     # todo evaluate range privacy leakage
 
     contingency_table_ = utils.contingency_table(X)
@@ -47,11 +47,11 @@ def dp_contingency_table(X, epsilon=1.0, range=None):
 
 
 def dp_joint_distribution(X, epsilon=1.0, range=None):
-    """Represent data as contingency table of all attributes"""
-    if range is None:
-        warnings.warn("Range parameter has not been specified. Falling back to taking range from the data.\n"
-                      "To ensure differential privacy, and no additional privacy leakage, the range must be "
-                      "specified independently of the data (i.e., using domain knowledge).", PrivacyLeakWarning)
+    """Represent data as a differentially private joint distribution of all attributes"""
+    # if range is None:
+    #     warnings.warn("Range parameter has not been specified. Falling back to taking range from the data.\n"
+    #                   "To ensure differential privacy, and no additional privacy leakage, the range must be "
+    #                   "specified independently of the data (i.e., using domain knowledge).", PrivacyLeakWarning)
     # todo evaluate range privacy leakage
 
     joint_distribution_ = utils.joint_distribution(X)
@@ -62,19 +62,19 @@ def dp_joint_distribution(X, epsilon=1.0, range=None):
 
     dp_mech = Laplace().set_epsilon(epsilon).set_sensitivity(sensitivity)
 
-    dp_joint_distribution = np.zeros_like(joint_distribution_.values)
+    dp_joint_distribution_ = np.zeros_like(joint_distribution_.values)
 
-    for i in np.arange(dp_joint_distribution.shape[0]):
-        dp_joint_distribution[i] = dp_mech.randomise(joint_distribution_[i])
+    for i in np.arange(dp_joint_distribution_.shape[0]):
+        dp_joint_distribution_[i] = dp_mech.randomise(joint_distribution_[i])
 
     # laplacian_noise = np.random.laplace(0, scale=sensitivity / epsilon, size=joint_distribution_.shape[0])
     # dp_joint_distribution = joint_distribution_ + laplacian_noise
 
     # noise can result into negative probabilities, thus set boundary at 0 and re-normalize
-    # dp_joint_distribution[dp_joint_distribution < 0 ] = 0
-    dp_joint_distribution = np.clip(dp_joint_distribution, a_min=0, a_max=None)
-    dp_joint_distribution = dp_joint_distribution / dp_joint_distribution.sum()
-    return pd.Series(dp_joint_distribution, index=joint_distribution_.index)
+    dp_joint_distribution_[dp_joint_distribution_ < 0] = 0
+    # dp_joint_distribution_ = np.clip(dp_joint_distribution_, a_min=0, a_max=None)
+    dp_joint_distribution_ = dp_joint_distribution_ / dp_joint_distribution_.sum()
+    return pd.Series(dp_joint_distribution_, index=joint_distribution_.index)
 
 
 
