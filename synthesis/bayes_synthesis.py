@@ -21,6 +21,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 import synthesis.tools.dp_utils as dp_utils
+import synthesis.tools.utils as utils
 from thomas.core.cpt import CPT
 from thomas.core.factor import Factor
 from thomas.core.bayesiannetwork import BayesianNetwork
@@ -66,6 +67,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         n_records = self._n_records if n_records is None else n_records
 
         Xt = self._generate_data(X, n_records)
+        print("\n Synthetic Data Generated")
         return Xt
 
     def _greedy_bayes(self, X):
@@ -76,9 +78,12 @@ class PrivBayes(BaseEstimator, TransformerMixin):
             self.k = self._compute_degree_network(n_records, n_columns)
         print("1/{} - Degree of network (k): {}\n".format(n_columns, self.k))
 
-        nodes, network, nodes_selected = self._init_network(X)
+        nodes, nodes_selected = self._init_network(X)
+        # normally equal to n_columns - 1 as only the root is selected, unless user implements new
+        # network init.
+        self._n_nodes_dp_computed = len(nodes) - len(nodes_selected)
 
-        while len(nodes_selected) < len(nodes):
+        for i in range(len(nodes_selected), len(nodes)):
             print("{}/{} - Evaluating next node to add to network".format(i+1, n_columns))
 
             nodes_remaining = nodes - nodes_selected
@@ -97,34 +102,65 @@ class PrivBayes(BaseEstimator, TransformerMixin):
                 sampled_pair = node_parent_pairs.index(max(scores))
             print("Sampled node: {} - with parents: {}\n".format(sampled_pair.node, sampled_pair.parents))
             nodes_selected.add(sampled_pair.node)
-            network.append(sampled_pair)
-        print("Learned Bayesian Network\n")
-        self.network_ = network
+            self.network_.append(sampled_pair)
+        print("Learned Network Structure\n")
         return self
 
-    def _init_network(self, X):
+    # def _init_network(self, X):
+    #
+    #     if self.score_function == 'mi':
+    #         # identify binary columns for calculating sensitivity
+    #         self._binary_columns = [c for c in X.columns if X[c].unique().size <=2]
+    #     elif self.score_function == 'f':
+    #         # todo encode data -> or make assertion and let user binary encode before callling
+    #         pass
+    #     elif self.score_function == 'r':
+    #         # todo
+    #         pass
+    #     else:
+    #         raise ValueError("Score function unknown select from {mi, f, r} - see PrivBayes paper")
+    #     nodes = set(X.columns)
+    #     network = []
+    #     nodes_selected = set()
+    #
+    #     root = np.random.choice(tuple(nodes))
+    #     network.append(NodeParentPair(node=root, parents=None))
+    #     nodes_selected.add(root)
+    #     print("Root of network: {}".format(root))
+    #
+    #     return nodes, network, nodes_selected
 
-        if self.score_function == 'mi':
-            # identify binary columns for calculating sensitivity
-            self._binary_columns = [c for c in X.columns if X[c].unique().size <=2]
-        elif self.score_function == 'f':
-            # todo encode data -> or make assertion and let user binary encode before callling
-            pass
-        elif self.score_function == 'r':
-            # todo
-            pass
-        else:
-            raise ValueError("Score function unknown select from {mi, f, r} - see PrivBayes paper")
+    def _init_network(self, X):
+        self._binary_columns = [c for c in X.columns if X[c].unique().size <= 2]
+
         nodes = set(X.columns)
-        network = []
+
+        # if getattr(self, 'network_', None):
+
+
+        if hasattr(self, 'network_'):
+            nodes_selected = set(n.node for n in self.network_)
+            # print("Pre-defined network init: {}".format(self.network_))
+            for i, pair in enumerate(self.network_):
+                print("{}/{} - init node {} - with parents: {}".format(i+1, len(self.network_),
+                                                                   pair.node, pair.parents))
+            return nodes, nodes_selected
+
+        # if set_network is not called we start with a random first node
+        self.network_ = []
         nodes_selected = set()
 
         root = np.random.choice(tuple(nodes))
-        network.append(NodeParentPair(node=root, parents=None))
+        self.network_.append(NodeParentPair(node=root, parents=None))
         nodes_selected.add(root)
         print("Root of network: {}".format(root))
+        return nodes, nodes_selected
 
-        return nodes, network, nodes_selected
+    def set_network(self, network):
+        assert [isinstance(n, NodeParentPair) for n in network], "input network does not consists of " \
+                                                                 "NodeParentPairs"
+        self.network_ = network
+
                     
     def _compute_scores(self, X, node_parent_pairs):
         cached_scores = self._get_cached_scores(node_parent_pairs)
@@ -163,6 +199,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         return mutual_info_score(df_node, df_parent)
 
     def _exponential_mechanism(self, X, node_parent_pairs, scores):
+        # todo check if dp correct -> e.g. 2*scaling?
         scaling_factors = self._compute_scaling_factor(X, node_parent_pairs)
         sampling_distribution = np.exp(scores / 2*scaling_factors)
         normalized_sampling_distribution = sampling_distribution / sampling_distribution.sum()
@@ -172,7 +209,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         return sampled_pair
 
     def _compute_scaling_factor(self, X, node_parent_pairs):
-        n_records, n_columns = X.shape
+        n_records = X.shape[0]
         scaling_factors = np.empty(len(node_parent_pairs))
         if self.score_function == 'mi':
             for idx, pair in enumerate(node_parent_pairs):
@@ -184,7 +221,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
                     sensitivity = (2/n_records)*np.log((n_records+1)/2) + \
                                   (((n_records-1)/n_records) * np.log((n_records+1)/(n_records-1)))
 
-                scaling_factors[idx] = (n_columns - 1) * sensitivity / (self.epsilon*self.epsilon_split[0])
+                scaling_factors[idx] = self._n_nodes_dp_computed * sensitivity / (self.epsilon*self.epsilon_split[0])
         return scaling_factors
 
 
@@ -215,15 +252,15 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         # first materialize noisy distributions for nodes who have a equal number of parents to the degree k.
         # earlier nodes can be inferred from these distributions without adding extra noise
         for idx, pair in enumerate(self.network_[self.k:]):
-            print(pair)
-            local_epsilon = self.epsilon * self.epsilon_split[1] / (X.shape[1] - self.k)
+            local_epsilon = self.epsilon * self.epsilon_split[1] / (self._n_columns - self.k)
 
             attributes = [*pair.parents, pair.node]
             dp_joint_distribution = dp_utils.dp_joint_distribution(X[attributes], epsilon=local_epsilon)
-            # todo: without conversion to pd.series
-            cpt = CPT(dp_joint_distribution, conditioned_variables=[pair.node]).normalize()
+            # dp_joint_distribution = utils.joint_distribution(X[attributes])
+            cpt = CPT(dp_joint_distribution, conditioned_variables=[pair.node])
+            # todo: use custom normalization to fill missing values with uniform
+            cpt = utils.normalize_cpt(cpt, dropna=False)
             P[pair.node] = cpt
-            # todo: how to store cpt ins bayesian network?
             # retain noisy joint distribution from k+1 node to infer distributions parent nodes
             if idx == 0:
                 infer_from_distribution = Factor(dp_joint_distribution)
@@ -235,7 +272,9 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         for pair in reversed(self.network_[:self.k]):
             # infer_from_distribution = infer_from_distribution.sum_out(pair.node)
             # conditioned_var = pair.parents[-1]
-            cpt = CPT(infer_from_distribution, conditioned_variables=[pair.node]).normalize()
+            cpt = CPT(infer_from_distribution, conditioned_variables=[pair.node])
+            cpt = utils.normalize_cpt(cpt, dropna=False)
+
             P[pair.node] = cpt
             infer_from_distribution = infer_from_distribution.sum_out(pair.node)
 
@@ -246,7 +285,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         Xt = np.empty([n_records, X.shape[1]], dtype=object)
 
         for i in range(n_records):
-            print('Number of records generated: {} / {}'.format(i, n_records), end='\r')
+            print('Number of records generated: {} / {}'.format(i+1, n_records), end='\r')
             record = self._sample_record()
             Xt[i] = list(record.values())
 
@@ -264,22 +303,102 @@ class PrivBayes(BaseEstimator, TransformerMixin):
             node_cpt = node.cpt
             for parent in node.conditioning:
                 parent_value = record[parent]
-                node_cpt = node_cpt[parent_value]
+                # node_cpt = node_cpt[parent_value]
 
-                # try:
-                #     node_cpt = node_cpt[parent_value]
-                # except:
-                #     print(record)
-                #     print(node)
-                #     print(node_cpt)
-                #     print("parent: {} - {}".format(parent, parent_value))
-                #     print('----')
+                try:
+                    node_cpt = node_cpt[parent_value]
+                except:
+                    print(record)
+                    print(node)
+                    print(node_cpt)
+                    print("parent: {} - {}".format(parent, parent_value))
+                    print('----')
+                    raise ValueError
 
             sampled_node_value = np.random.choice(node.states, p=node_cpt)
 
             record[node.name] = sampled_node_value
 
         return record
+
+
+class PrivBayesFix(PrivBayes):
+
+    def __init__(self, epsilon: float = 1.0, degree_network=None,
+                 theta_usefulness=4, score_function='mi', random_state=None,
+                 epsilon_split=None):
+        super().__init__(epsilon=epsilon, degree_network=degree_network)
+
+    # def _init_network(self, X):
+    #     # todo implement user-specified init network
+    #
+    #     nodes = set(X.columns)
+    #     network = []
+    #     nodes_selected = set()
+    #
+    #     root = np.random.choice(tuple(nodes))
+    #     network.append(NodeParentPair(node=root, parents=None))
+    #     nodes_selected.add(root)
+    #     print("Root of network: {}".format(root))
+
+    def fit(self, X, y=None):
+        self._header = list(X.columns)
+        return super().fit(X, y)
+
+    def transform(self, X, n_records=None):
+        n_records = X.shape[0] if n_records is None else n_records
+        assert n_records <= X.shape[0], "Cannot condition more records than present in input X"
+
+        Xt = self._generate_data(X, n_records)
+        return Xt
+
+    def _generate_data(self, X, n_records):
+        Xt = np.empty([n_records, len(self.network_)], dtype=object)
+
+        for i in range(n_records):
+            print('Number of records generated: {} / {}'.format(i+1, n_records), end='\r')
+            record_init = X.iloc[i].to_dict()
+            record = self._sample_record(record_init)
+            Xt[i] = list(record.values())
+
+        # np to df with original column ordering
+        df_synth = pd.DataFrame(Xt, columns=[c.node for c in self.network_])[self._header]
+        return df_synth
+
+
+
+    def _sample_record(self, record_init):
+        # assume X has columns with values that correspond to the first nodes in the network
+        # that we would like to fix and condition for.
+        record = record_init
+
+        # sample remaining nodes after fixing for input X
+        for col_idx, pair in enumerate(self.network_[len(record_init):]):
+            node = self.bayesian_network_[pair.node]
+            # todo filter cpt based on sampled parents
+
+            # specify pre-sampled conditioning values
+            node_cpt = node.cpt
+            for parent in node.conditioning:
+                parent_value = record[parent]
+                # node_cpt = node_cpt[parent_value]
+                try:
+                    node_cpt = node_cpt[parent_value]
+                except:
+                    print(record)
+                    print(node)
+                    print(node_cpt)
+                    print("parent: {} - {}".format(parent, parent_value))
+                    print('----')
+                    raise ValueError
+
+            sampled_node_value = np.random.choice(node.states, p=node_cpt)
+
+            record[node.name] = sampled_node_value
+
+        return record
+
+
 
 
 if __name__ == "__main__":
@@ -298,5 +417,21 @@ if __name__ == "__main__":
 
     pb_copy = deepcopy(pb)
 
-    df_synth = pb.transform(df)
+    df_synth = pb.transform(df, n_records=1000)
     df_synth.head()
+    
+    # fixing a network - specify init network to fix those variables when generating
+    pbfix = PrivBayesFix(epsilon, degree_network=2)
+    # init_network = [NodeParentPair('age', None), NodeParentPair('education', 'age')]
+    init_network = [NodeParentPair(node='age', parents=None),
+                     NodeParentPair(node='education', parents='age'),
+                     NodeParentPair(node='sex', parents=('age', 'education')),
+                     NodeParentPair(node='workclass', parents=('age', 'education')),
+                     NodeParentPair(node='income', parents=('sex', 'age'))]
+    pbfix.set_network(init_network)
+    pbfix.fit(df)
+    pbfix_copy = deepcopy(pbfix)
+
+
+    # df_synth = df.copy() # todo should really be synth
+    df_synth_tuned = pbfix.transform(df_synth[['age', 'education']])
