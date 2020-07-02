@@ -39,20 +39,26 @@ def joint_distribution(X):
     return joint_distribution_
 
 
+def conditional_distribution(X, conditioned_variables):
+    joint_distribution_ = joint_distribution(X)
+    cpt = CPT(joint_distribution_, conditioned_variables=conditioned_variables)
+    # todo: use custom normalization to fill missing values with uniform
+    cpt = normalize_cpt(cpt, dropna=False)
+    return cpt
+
+
 def normalize_cpt(cpt, dropna=False):
     """normalization of cpt with option to fill missing values with uniform distribution"""
     if dropna or not cpt.conditioning:
         return cpt.normalize()
 
     # fill missing combinations with uniform distribution
-    try:
-        cpt_norm_full = cpt._data / cpt.unstack().sum(axis=1)
-    except:
-        print(cpt)
-        print(';')
+    cpt_norm_full = cpt._data / cpt.unstack().sum(axis=1)
     uniform_prob = 1 / len(cpt.variable_states[cpt.conditioned[-1]])
     cpt_norm_full = cpt_norm_full.fillna(uniform_prob)
     return CPT(cpt_norm_full)
+
+
 # def contingency_table(X):
 #     """Represent data as contingency table of all attributes"""
 #     #todo can we do this faster using pd_crosstab or the old privbayes method? -> check nan bins

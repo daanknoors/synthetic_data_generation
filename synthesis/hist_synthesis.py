@@ -47,7 +47,7 @@ class HistSynthesizer(BaseEstimator, TransformerMixin):
         # return pd.DataFrame(sampled_records, columns=self.column_names_)
 
     def score(self, X, y=None, j_ways=1):
-        """Return average variation distance
+        """Return jensen-shannon distance
 
            Parameters
            ----------

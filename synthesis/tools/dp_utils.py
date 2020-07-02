@@ -13,6 +13,7 @@ from diffprivlib.tools.histograms import histogram as diffprivlib_hist
 
 from diffprivlib.mechanisms import Laplace, LaplaceBoundedDomain
 from diffprivlib.utils import PrivacyLeakWarning
+from thomas.core import CPT
 
 import synthesis.tools.utils as utils
 
@@ -77,6 +78,10 @@ def dp_joint_distribution(X, epsilon=1.0, range=None):
     return pd.Series(dp_joint_distribution_, index=joint_distribution_.index)
 
 
-
-
+def dp_conditional_distribution(X, epsilon=1.0, conditioned_variables=None, range=None):
+    dp_joint_distribution_ = dp_joint_distribution(X, epsilon=epsilon)
+    cpt = CPT(dp_joint_distribution_, conditioned_variables=conditioned_variables)
+    # todo: use custom normalization to fill missing values with uniform
+    cpt = utils.normalize_cpt(cpt, dropna=False)
+    return cpt
 

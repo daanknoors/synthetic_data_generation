@@ -61,7 +61,7 @@ class GeneralizeDateSequence(TransformerMixin, BaseEstimator):
         assert Xt.columns.isin(self.date_sequence).all(), 'input dataframe contains columns not seen in fit'
 
         if not pd.core.dtypes.common.is_period_dtype(Xt[self.reference_date_col]):
-            pd.to_datetime(Xt[self.reference_date_col].astype(str)).dt.to_period('m')
+            Xt[self.reference_date_col] = pd.to_datetime(Xt[self.reference_date_col].astype(str)).dt.to_period('m')
 
         reference_period_ym = Xt[self.reference_date_col]
         days_in_month = reference_period_ym.dt.days_in_month
@@ -76,12 +76,12 @@ class GeneralizeDateSequence(TransformerMixin, BaseEstimator):
                                              'day': sample_days})
 
         # Xinv = check_array(Xt, copy=True, dtype=FLOAT_DTYPES)
-        Xinv = X.copy()
+        Xinv = Xt.copy()
         Xinv[self.reference_date_col] = reference_date_ymd
 
         for c in self.date_sequence[1:]:
             # add days to reference date
-            Xinv[c] = reference_date_ymd + pd.to_timedelta(Xinv[c], unit='d')
+            Xinv[c] = reference_date_ymd + pd.to_timedelta(Xinv[c].astype(float), unit='d')
 
 
         return Xinv

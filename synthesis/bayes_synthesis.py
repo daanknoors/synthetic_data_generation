@@ -38,19 +38,20 @@ class PrivBayes(BaseEstimator, TransformerMixin):
     """PrivBayes: generate data based on DP Bayesian Network"""
 
     def __init__(self, epsilon: float = 1.0, degree_network=None,
-                 theta_usefulness=4, score_function='mi', random_state=None,
-                 epsilon_split=None):
+                 theta_usefulness=4, score_function='mi', random_state=None):
         self.epsilon = epsilon
         self.k = degree_network
         self.theta = theta_usefulness
-        self.score_function = score_function.lower()
+        self.score_function = score_function
         self.random_state = random_state
-        if epsilon_split is None:
-            self.epsilon_split = [0.4, 0.6]
-        else:
-            if isinstance(epsilon_split, float):
-                epsilon_split = [epsilon_split, 1-epsilon_split]
-            self.epsilon_split = list(epsilon_split)
+        # todo fix arg epsilon_split to work in pipeline
+        self.epsilon_split = [0.4, 0.6]
+        # if epsilon_split is None:
+        #     self.epsilon_split = [0.4, 0.6]
+        # else:
+        #     if isinstance(epsilon_split, float):
+        #         epsilon_split = [epsilon_split, 1-epsilon_split]
+        #     self.epsilon_split = list(epsilon_split)
 
     def fit(self, X, y=None):
         self._n_records, self._n_columns = X.shape
@@ -93,6 +94,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
                 NodeParentPair(n, tuple(p)) for n in nodes_remaining
                 for p in combinations(nodes_selected, n_parents)
             ]
+            print("Number of NodeParentPair candidates: {}".format(len(node_parent_pairs)))
 
             scores = self._compute_scores(X, node_parent_pairs)
 
@@ -100,43 +102,15 @@ class PrivBayes(BaseEstimator, TransformerMixin):
                 sampled_pair = self._exponential_mechanism(X, node_parent_pairs, scores)
             else:
                 sampled_pair = node_parent_pairs.index(max(scores))
-            print("Sampled node: {} - with parents: {}\n".format(sampled_pair.node, sampled_pair.parents))
+            print("Selected node: {} - with parents: {}\n".format(sampled_pair.node, sampled_pair.parents))
             nodes_selected.add(sampled_pair.node)
             self.network_.append(sampled_pair)
         print("Learned Network Structure\n")
         return self
 
-    # def _init_network(self, X):
-    #
-    #     if self.score_function == 'mi':
-    #         # identify binary columns for calculating sensitivity
-    #         self._binary_columns = [c for c in X.columns if X[c].unique().size <=2]
-    #     elif self.score_function == 'f':
-    #         # todo encode data -> or make assertion and let user binary encode before callling
-    #         pass
-    #     elif self.score_function == 'r':
-    #         # todo
-    #         pass
-    #     else:
-    #         raise ValueError("Score function unknown select from {mi, f, r} - see PrivBayes paper")
-    #     nodes = set(X.columns)
-    #     network = []
-    #     nodes_selected = set()
-    #
-    #     root = np.random.choice(tuple(nodes))
-    #     network.append(NodeParentPair(node=root, parents=None))
-    #     nodes_selected.add(root)
-    #     print("Root of network: {}".format(root))
-    #
-    #     return nodes, network, nodes_selected
-
     def _init_network(self, X):
         self._binary_columns = [c for c in X.columns if X[c].unique().size <= 2]
-
         nodes = set(X.columns)
-
-        # if getattr(self, 'network_', None):
-
 
         if hasattr(self, 'network_'):
             nodes_selected = set(n.node for n in self.network_)
@@ -153,13 +127,14 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         root = np.random.choice(tuple(nodes))
         self.network_.append(NodeParentPair(node=root, parents=None))
         nodes_selected.add(root)
-        print("Root of network: {}".format(root))
+        print("Root of network: {}\n".format(root))
         return nodes, nodes_selected
 
     def set_network(self, network):
         assert [isinstance(n, NodeParentPair) for n in network], "input network does not consists of " \
                                                                  "NodeParentPairs"
         self.network_ = network
+        return self
 
                     
     def _compute_scores(self, X, node_parent_pairs):
@@ -168,7 +143,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         scores = np.empty(len(node_parent_pairs))
         for idx, pair in enumerate(node_parent_pairs):
             if self.score_function == 'mi':
-                scores[idx] = self._compute_mutual_information(X, pair)
+                scores[idx] = self._compute_mutual_information_sklearn(X, pair)
         return scores
 
 
@@ -182,14 +157,9 @@ class PrivBayes(BaseEstimator, TransformerMixin):
 
         # todo: have to get values from Factor: 'numpy.ndarray' object has no attribute '_data'
         mi = np.sum(p_nodeparents.values * np.log(p_nodeparents/(p_node*p_parents)))
-        mi_old = self._compute_mutual_information_old(X, pair)
-        if mi != mi_old:
-            print('New mi: {} - old mi: {}'.format(mi, mi_old))
         return mi
 
-
-
-    def _compute_mutual_information_old(self, X, pair):
+    def _compute_mutual_information_sklearn(self, X, pair):
         df_node = X[pair.node].values
         if len(pair.parents) == 1:
             df_parent = X[pair.parents[0]].values
@@ -197,6 +167,9 @@ class PrivBayes(BaseEstimator, TransformerMixin):
             # todo find alternative method to combine parent cols
             df_parent = X.loc[:, pair.parents].apply(lambda x: ' '.join(x.values), axis=1).values
         return mutual_info_score(df_node, df_parent)
+
+
+
 
     def _exponential_mechanism(self, X, node_parent_pairs, scores):
         # todo check if dp correct -> e.g. 2*scaling?
@@ -248,11 +221,12 @@ class PrivBayes(BaseEstimator, TransformerMixin):
 
     def _compute_conditional_distributions(self, X):
         P = dict()
+        local_epsilon = self.epsilon * self.epsilon_split[1] / (self._n_columns - self.k)
 
         # first materialize noisy distributions for nodes who have a equal number of parents to the degree k.
         # earlier nodes can be inferred from these distributions without adding extra noise
         for idx, pair in enumerate(self.network_[self.k:]):
-            local_epsilon = self.epsilon * self.epsilon_split[1] / (self._n_columns - self.k)
+            print('Learning conditional probabilities: {} - with parents {}'.format(pair.node, pair.parents))
 
             attributes = [*pair.parents, pair.node]
             dp_joint_distribution = dp_utils.dp_joint_distribution(X[attributes], epsilon=local_epsilon)
@@ -270,6 +244,8 @@ class PrivBayes(BaseEstimator, TransformerMixin):
 
         # go iteratively from node at k to root of network, sum out child nodes and get cpt.
         for pair in reversed(self.network_[:self.k]):
+            print('Learning conditional probabilities: {} - with parents {}'.format(pair.node, pair.parents))
+
             # infer_from_distribution = infer_from_distribution.sum_out(pair.node)
             # conditioned_var = pair.parents[-1]
             cpt = CPT(infer_from_distribution, conditioned_variables=[pair.node])
@@ -325,8 +301,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
 class PrivBayesFix(PrivBayes):
 
     def __init__(self, epsilon: float = 1.0, degree_network=None,
-                 theta_usefulness=4, score_function='mi', random_state=None,
-                 epsilon_split=None):
+                 theta_usefulness=4, score_function='mi', random_state=None):
         super().__init__(epsilon=epsilon, degree_network=degree_network)
 
     # def _init_network(self, X):
