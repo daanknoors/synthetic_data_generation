@@ -17,19 +17,27 @@ from diffprivlib.mechanisms import Laplace, LaplaceBoundedDomain
 from diffprivlib.utils import PrivacyLeakWarning
 
 
+# def contingency_table(X):
+#     """Represent data as contingency table of all attributes"""
+#     # X is normally categorical, convert everything to string to prevent indexing issues
+#     X = X.astype(str)
+#     columns = list(X.columns)
+#
+#     counts = X.fillna('nan').groupby(columns).size().astype(float)
+#
+#     # get variable combinations that do not occur in the data and set count to 0
+#     full_space_index = pd.MultiIndex.from_tuples(tuple(product(*counts.index.levels)),
+#                                                  names=counts.index.names)
+#     contingency_table_ = pd.Series(data=0, index=full_space_index).combine(counts, max)
+#     return contingency_table_
+
+
 def contingency_table(X):
     """Represent data as contingency table of all attributes"""
-    # X is normally categorical, convert everything to string to prevent indexing issues
-    X = X.astype(str)
-    columns = list(X.columns)
+    index = [X[c] for c in X.columns[:-1]]
+    column = X[X.columns[-1]]
+    return pd.crosstab(index, column, dropna=False).stack()
 
-    counts = X.fillna('nan').groupby(columns).size().astype(float)
-
-    # get variable combinations that do not occur in the data and set count to 0
-    full_space_index = pd.MultiIndex.from_tuples(tuple(product(*counts.index.levels)),
-                                                 names=counts.index.names)
-    contingency_table_ = pd.Series(data=0, index=full_space_index).combine(counts, max)
-    return contingency_table_
 
 def joint_distribution(X):
     """Get joint distribution by normalizing contingency table"""
