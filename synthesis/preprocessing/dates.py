@@ -87,9 +87,6 @@ class GeneralizeDateSequence(TransformerMixin, BaseEstimator):
         return Xinv
 
 
-class CalculateColumns():
-    pass
-
 if __name__ == '__main__':
     data_path = Path("c:/data/1_iknl/processed/crc_behandeling.csv")
     X = pd.read_csv(data_path)

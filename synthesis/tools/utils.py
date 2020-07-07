@@ -43,7 +43,6 @@ def joint_distribution(X):
     """Get joint distribution by normalizing contingency table"""
     contingency_table_ = contingency_table(X)
     joint_distribution_ = contingency_table_ / contingency_table_.sum()
-
     return joint_distribution_
 
 
