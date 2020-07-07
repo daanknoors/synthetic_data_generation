@@ -106,7 +106,6 @@ venv.bak/
 **/ipynb_checkpoints
 
 *.zip
-**/data
 **/output
 **/notebooks
 **/results
