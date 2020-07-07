@@ -12,7 +12,10 @@ from pathlib import Path
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_array, check_is_fitted, FLOAT_DTYPES
-from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
+
+from synthesis.tools.dp_utils import dp_marginal_distribution
+
 
 class GeneralizeContinuous(KBinsDiscretizer):
 
@@ -126,7 +129,7 @@ class GeneralizeContinuous(KBinsDiscretizer):
 
     def _infer_numerical_type(self, X):
         """Determine if numerical column is an integer of float for inverse transform"""
-        assert X.select_dtypes(exclude=['int', 'float']).shape[1] == 0, "input X contains non-numeric columns"
+        # assert X.select_dtypes(exclude=['int', 'float']).shape[1] == 0, "input X contains non-numeric columns"
         self.integer_columns = []
         self.float_columns = []
 
@@ -165,11 +168,104 @@ class GeneralizeContinuous(KBinsDiscretizer):
         return Xinv
 
 
+class GeneralizeCategorical(GeneralizeContinuous):
+
+    def __init__(self, epsilon=1.0, n_bins=10, strategy='uniform', labeled_missing=None):
+        super().__init__(n_bins=n_bins, strategy=strategy, encode='ordinal')
+        self.epsilon = epsilon
+
+
+    def fit(self, X, y=None):
+        """Process:
+        1. Get DP marginal distribution of each column in X
+        2. Group unique values in X by bin size -> bin_size = np.ceil(len(X[c]) / n_bins)
+        3. Bin_edges =
+        """
+        local_epsilon = self.epsilon / X.shape[1]
+        self.marginals_ = {}
+        self._ordinalencoders = {}
+
+        X_enc = np.empty_like(X)
+
+        for jj, c in enumerate(X.columns):
+            self._ordinalencoders[c] = OrdinalEncoder().fit(X[c])
+            X_enc[:, jj] = self._ordinalencoders[c].transform(X[c])
+
+            # get dp marginal of encoded feature
+            self.marginals_[c] = dp_marginal_distribution(X_enc[c], local_epsilon)
+
+        return super().fit(X_enc, y)
+
+    def transform(self, X):
+        """Equivalent to continuous transform but we still need to encode the data beforehand"""
+        X_enc = np.empty_like(X)
+
+        for jj, c in enumerate(X.columns):
+            self._ordinalencoders[c] = OrdinalEncoder().fit(X[c])
+            X_enc[:, jj] = self._ordinalencoders[c].transform(X[c])
+        return super().transform(X_enc)
+
+    def inverse_transform(self, Xt):
+
+        Xinv = check_array(Xt, copy=True, dtype=FLOAT_DTYPES, force_all_finite='allow-nan')
+        # Xinv = Xt.copy()
+        n_features = self.n_bins_.shape[0]
+        if Xinv.shape[1] != n_features:
+            raise ValueError("Incorrect number of features. Expecting {}, "
+                             "received {}.".format(n_features, Xinv.shape[1]))
+
+        for jj, c in enumerate(X.columns):
+            bin_edges = self.bin_edges_[jj]
+            lower_bounds = bin_edges[np.int_(Xinv[:, jj])]
+            upper_bounds = bin_edges[np.int_(Xinv[:, jj]) + 1]
+
+            self.marginals_[c]
+
+class GeneralizeCategorical(GeneralizeContinuous):
+
+    def __init__(self, epsilon=1.0, n_bins=10, strategy='uniform', labeled_missing=None):
+        super().__init__(n_bins=n_bins, strategy=strategy, encode='ordinal')
+        self.epsilon = epsilon
+
+    def fit(self, X, y=None):
+        # if user-specified bins in form of iterable or dict
+        if self.bins:
+            pass
+
+        self.marginals_ = {}
+        self._ordinalencoders = {}
+        X_enc = np.empty_like(X)
+        for jj, c in enumerate(X.columns):
+            uniques = sorted(set(X[c]))
+            uniques, counts = X[c].value_counts(dropna=False)
+
+            local_epsilon = self.epsilon / X.shape[1]
+            self.marginals_[c] = dp_marginal_distribution(X[c], local_epsilon)
+
+            # get numeric values - store encoder for inverse transform
+            self._ordinalencoders[c] = OrdinalEncoder().fit(X[c])
+            X_enc[:, jj] = self._ordinalencoders[c].transform(X[c])
+
+
+        return super().fit(X_enc, y)
+
+    def inverse_transform(self, Xt):
+        X_enc = super().inverse_transform(Xt)
+        for jj in range(X_enc.shape[1]):
+            # todo fix column names indexing
+            # todo ensure inverse gives back X_enc which OrdinalEncoder.inverse_transform(X_le)
+            pass
+
+
+
+
+
+
 if __name__ == '__main__':
     data_path = Path("c:/data/1_iknl/processed/bente/cc_9col.csv")
     X = pd.read_csv(data_path)
     columns = ['tum_topo_sublokalisatie_code', 'tum_differentiatiegraad_code', 'tum_lymfklieren_positief_atl']
-    columns = ['tum_lymfklieren_positief_atl']
+    # columns = ['tum_lymfklieren_positief_atl']
     X = X.loc[:, columns]
     print(X.head(20))
 

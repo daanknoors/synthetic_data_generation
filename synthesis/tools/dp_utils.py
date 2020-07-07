@@ -38,7 +38,7 @@ def dp_contingency_table(X, epsilon=1.0, range=None):
     dp_contingency_table = np.zeros_like(contingency_table_.values)
 
     for i in np.arange(dp_contingency_table.shape[0]):
-        # round counts upwards to preserve bins with noisy count lower than 1
+        # round counts upwards to preserve bins with noisy count between [0, 1]
         dp_contingency_table[i] = np.ceil(dp_mech.randomise(contingency_table_[i]))
 
     # noise can result into negative counts, thus set boundary at 0
@@ -47,8 +47,29 @@ def dp_contingency_table(X, epsilon=1.0, range=None):
     return pd.Series(dp_contingency_table, index=contingency_table_.index)
 
 
+def dp_marginal_distribution(X, epsilon=1.0, range=None):
+    assert X.shape[0] == 1, 'can only do 1-way marginal distribution, check contingency table or ' \
+                            'joint distribution for higher dimensions'
+    marginal = X.value_counts(normalize=True, dropna=False)
+
+    # removing one record from X will decrease probability 1/n in one cell of the
+    # marginal distribution and increase the probability 1/n in the remaining cells
+    sensitivity = 2/X.shape[0]
+
+    dp_mech = Laplace().set_epsilon(epsilon).set_sensitivity(sensitivity)
+    dp_marginal = np.zeros_like(marginal.values)
+
+    for i in np.arange(dp_marginal.shape[0]):
+        # round counts upwards to preserve bins with noisy count between [0, 1]
+        dp_marginal[i] = np.ceil(dp_mech.randomise(marginal[i]))
+
+    # noise can result into negative counts, thus set boundary at 0
+    dp_marginal = np.clip(dp_marginal, a_min=0, a_max=None)
+    return pd.Series(dp_marginal, index=marginal.index)
+
+
 def dp_joint_distribution(X, epsilon=1.0, range=None):
-    """Represent data as a differentially private joint distribution of all attributes"""
+    """Represent data as a differentially private joint distribution of all attributes in input X"""
     # if range is None:
     #     warnings.warn("Range parameter has not been specified. Falling back to taking range from the data.\n"
     #                   "To ensure differential privacy, and no additional privacy leakage, the range must be "
