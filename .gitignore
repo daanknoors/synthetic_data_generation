@@ -115,7 +115,8 @@ venv.bak/
 *.sas7bdat
 .idea/
 .vscode/
-**/examples
+**/examples/experimental
+**/examples/models
 
 
 *.ctl
