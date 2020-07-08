@@ -110,12 +110,11 @@ venv.bak/
 **/notebooks
 **/results
 **/archive
-*.csv
 *.sas7bdat
 .idea/
 .vscode/
 **/examples/experimental
 **/examples/models
-
+examples/data/input/chicago_crimes_2012_2017.csv
 
 *.ctl
