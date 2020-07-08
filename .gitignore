@@ -110,6 +110,7 @@ venv.bak/
 **/notebooks
 **/results
 **/archive
+*.csv
 *.sas7bdat
 .idea/
 .vscode/

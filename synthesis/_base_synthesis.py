@@ -44,18 +44,9 @@ class _BaseSynthesizer(BaseEstimator):
 
         return self
 
-    def save_model(self, path= None):
-        serializable_model = {col:{k:v.tolist() for k, v in stats.items()} for col, stats in self.model_.items()}
-        if not path:
-            path = self.name + '.json'
-        with open(path, 'w') as fp:
-            json.dump(serializable_model, fp, indent=4)
 
-    def load_model(self, path=None):
-        if not path:
-            path = self.name + '.json'
-        with open(path, 'r') as fp:
-            self.model_ = json.load(fp)
+
+
 
 
 class _BaseHistSynthesizer(TransformerMixin, BaseEstimator):

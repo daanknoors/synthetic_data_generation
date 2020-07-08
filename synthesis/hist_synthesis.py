@@ -9,7 +9,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_random_state
 from scipy.spatial.distance import jensenshannon
 
-from synthesis.tools import dp_utils
+import synthesis.tools.dp_utils as sts
 
 
 class HistSynthesizer(BaseEstimator, TransformerMixin):
@@ -30,7 +30,7 @@ class HistSynthesizer(BaseEstimator, TransformerMixin):
         #todo evaluate need for sklearn checks, e.g. check_x_y()
         self.column_names_ = X.columns
         self.n_records_ = X.shape[0]
-        self.dp_contingency_table_, self.X_bins_ = dp_utils.dp_contingency_table(X, self.epsilon)
+        self.dp_contingency_table_, self.X_bins_ = sts.dp_contingency_table(X, self.epsilon)
         print('Obtained noisy hist')
         return self
 
@@ -88,7 +88,6 @@ class HistSynthesizer(BaseEstimator, TransformerMixin):
 
 
 class ConditionalHistSynthesizer(HistSynthesizer):
-    """Represent data as histogram. When generating can fix condition for certain values in histogram"""
 
     def __init__(self, epsilon: float = 1.0, random_state=None):
         super().__init__(epsilon=epsilon, random_state=random_state)
@@ -144,53 +143,7 @@ class ConditionalHistSynthesizer(HistSynthesizer):
         return self.dp_contingency_table_[condition_idx], self.X_bins_[condition_idx]
 
 
-class MarginalSynthesizer(BaseEstimator, TransformerMixin):
-    """Per-column histogram synthesis - sample from DP marginal distributions.
-    Will work with any dataset that fits into memory. Does not aim to preserve
-    patterns between columns."""
 
-    def __init__(self, epsilon: float = 1.0, random_state=None):
-        # super().__init__()
-        self.epsilon = epsilon
-        self.random_state = random_state
-
-    def fit(self, X, y=None):
-        if hasattr(self, 'schema_'):
-            return self
-
-        self._n_records, self._n_columns = X.shape
-        self.get_schema(X)
-        return self
-
-    def transform(self, X, n_records=None):
-        if not n_records:
-            n_records = self._n_records
-
-        Xt = {}
-        for c in X.columns:
-            column_values = list(self.schema_[c].keys())
-            column_value_probabilities = list(self.schema_[c].values())
-            column_sampled = np.random.choice(column_values, p=column_value_probabilities, size=n_records, replace=True)
-            Xt[c] = column_sampled
-            print('Column sampled: {}'.format(c))
-        return pd.DataFrame(Xt)
-
-    def get_schema(self, X):
-        local_epsilon = self.epsilon / X.shape[1]
-        self.schema_ = {}
-        for c in X.columns:
-            # note that in Python 3 dicts remember insertion order - thus no need to use ordered dict
-            marginal = dp_utils.dp_marginal_distribution(X[c], local_epsilon)
-            self.schema_[c] = marginal.to_dict()
-            print('Column fitted: {}'.format(c))
-        return self
-
-    def set_schema(self, schema, n_records):
-        """Give option to user to define schema, else infer from data"""
-        self._n_records = n_records
-        self._n_columns = len(schema)
-        self.schema_ = schema
-        return self
 
 
 def compare_synthetic_data(X, y):

@@ -48,7 +48,7 @@ def dp_contingency_table(X, epsilon=1.0, range=None):
 
 
 def dp_marginal_distribution(X, epsilon=1.0, range=None):
-    assert len(X.shape) == 1, 'can only do 1-way marginal distribution, check contingency table or ' \
+    assert X.shape[0] == 1, 'can only do 1-way marginal distribution, check contingency table or ' \
                             'joint distribution for higher dimensions'
     marginal = X.value_counts(normalize=True, dropna=False)
 
@@ -61,12 +61,10 @@ def dp_marginal_distribution(X, epsilon=1.0, range=None):
 
     for i in np.arange(dp_marginal.shape[0]):
         # round counts upwards to preserve bins with noisy count between [0, 1]
-        dp_marginal[i] = dp_mech.randomise(marginal[i])
+        dp_marginal[i] = np.ceil(dp_mech.randomise(marginal[i]))
 
     # noise can result into negative counts, thus set boundary at 0
     dp_marginal = np.clip(dp_marginal, a_min=0, a_max=None)
-    dp_marginal = dp_marginal / dp_marginal.sum()
-
     return pd.Series(dp_marginal, index=marginal.index)
 
 

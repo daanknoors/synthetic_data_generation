@@ -9,7 +9,7 @@ from scipy.spatial.distance import jensenshannon
 
 def feature_distances(x1, x2, distance_function=None):
     """Distance between each feature. Optional: input own distance function"""
-    assert (x1.columns == x2.columns).all(), "input x1 and x2 have different features"
+    assert x1.columns == x2.columns, "input x1 and x2 have different features"
     if distance_function is None:
         distance_function = jensenshannon
 
@@ -32,7 +32,7 @@ def jensenshannon_df(x1, x2, j_ways=1):
     """Jensen_shannon distance over all features in dataframe.
     Returns distance per feature and average distance
     """
-    assert (x1.columns == x2.columns).all(), "input x1 and x2 have different features"
+    assert x1.columns == x2.columns, "input x1 and x2 have different features"
     feature_distances = {}
     average_feature_distance = np.empty_like(x1.columns)
     for i, c in enumerate(x1.columns):
