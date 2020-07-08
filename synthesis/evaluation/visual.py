@@ -4,18 +4,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from synthesis.evaluation.metrics import feature_distances
+from synthesis.evaluation import metrics
 
 def plot_feature_distances(x1, x2, labels=None):
     if labels is None:
         labels = ['x1', 'x2']
 
-    features, feature_distances = feature_distances(x1, x2)
+    features, feature_distances = metrics.feature_distances(x1, x2)
     y_pos = np.arange(len(features))
 
-    plt.bar(y_pos, feature_distances)
-    plt.xticks(y_pos, features)
-    plt.ylabel('Feature distance')
+    plt.barh(y_pos, feature_distances)
+    plt.yticks(y_pos, features)
+    plt.xlabel('Feature distance')
     plt.title('Distances per feature')
     plt.tight_layout()
     plt.show()
