@@ -171,90 +171,90 @@ class GeneralizeContinuous(KBinsDiscretizer):
 class GeneralizeCategorical(GeneralizeContinuous):
 
     def __init__(self, epsilon=1.0, n_bins=10, strategy='uniform', labeled_missing=None):
-        super().__init__(n_bins=n_bins, strategy=strategy, encode='ordinal')
+        super().__init__(n_bins=n_bins, strategy=strategy)
         self.epsilon = epsilon
 
 
     def fit(self, X, y=None):
-        """Process:
-        1. Get DP marginal distribution of each column in X
-        2. Group unique values in X by bin size -> bin_size = np.ceil(len(X[c]) / n_bins)
-        3. Bin_edges =
+        """ Steps:
+        1. Transform categorical to continuous
+        2. Store DP marginal counts for optional inverse transform
+        3. Run super().fit() to get groups
         """
         local_epsilon = self.epsilon / X.shape[1]
+        self._ordinalencoder = OrdinalEncoder().fit(X)
+        #todo: turn into numpy -> df needed for marginal distribution
+        X_enc = self._ordinalencoder.transform(X)
+        X_enc = pd.DataFrame(X_enc, columns=X.columns)
+
+        # get dp marginal of encoded feature
         self.marginals_ = {}
-        self._ordinalencoders = {}
-
-        X_enc = np.empty_like(X)
-
         for jj, c in enumerate(X.columns):
-            self._ordinalencoders[c] = OrdinalEncoder().fit(X[c])
-            X_enc[:, jj] = self._ordinalencoders[c].transform(X[c])
-
-            # get dp marginal of encoded feature
-            self.marginals_[c] = dp_marginal_distribution(X_enc[c], local_epsilon)
+            self.marginals_[c] = dp_marginal_distribution(X_enc.loc[:, c], local_epsilon).sort_index()
 
         return super().fit(X_enc, y)
 
     def transform(self, X):
         """Equivalent to continuous transform but we still need to encode the data beforehand"""
-        X_enc = np.empty_like(X)
-
-        for jj, c in enumerate(X.columns):
-            self._ordinalencoders[c] = OrdinalEncoder().fit(X[c])
-            X_enc[:, jj] = self._ordinalencoders[c].transform(X[c])
+        X_enc = self._ordinalencoder.transform(X)
         return super().transform(X_enc)
 
     def inverse_transform(self, Xt):
 
-        Xinv = check_array(Xt, copy=True, dtype=FLOAT_DTYPES, force_all_finite='allow-nan')
+        X_enc = check_array(Xt, copy=True, dtype=FLOAT_DTYPES, force_all_finite='allow-nan')
         # Xinv = Xt.copy()
-        n_features = self.n_bins_.shape[0]
-        if Xinv.shape[1] != n_features:
+        n_records, n_features = X_enc.shape
+        if X_enc.shape[1] != n_features:
             raise ValueError("Incorrect number of features. Expecting {}, "
-                             "received {}.".format(n_features, Xinv.shape[1]))
+                             "received {}.".format(n_features, X_enc.shape[1]))
 
-        for jj, c in enumerate(X.columns):
+        for jj, c in enumerate(Xt.columns):
             bin_edges = self.bin_edges_[jj]
-            lower_bounds = bin_edges[np.int_(Xinv[:, jj])]
-            upper_bounds = bin_edges[np.int_(Xinv[:, jj]) + 1]
+            lower_bounds = bin_edges[np.int_(X_enc[:, jj])]
+            upper_bounds = bin_edges[np.int_(X_enc[:, jj]) + 1]
+            for i in n_records:
+                self.marginals_[c].values()
 
-            self.marginals_[c]
-
-class GeneralizeCategorical(GeneralizeContinuous):
-
-    def __init__(self, epsilon=1.0, n_bins=10, strategy='uniform', labeled_missing=None):
-        super().__init__(n_bins=n_bins, strategy=strategy, encode='ordinal')
-        self.epsilon = epsilon
-
-    def fit(self, X, y=None):
-        # if user-specified bins in form of iterable or dict
-        if self.bins:
-            pass
-
-        self.marginals_ = {}
-        self._ordinalencoders = {}
-        X_enc = np.empty_like(X)
-        for jj, c in enumerate(X.columns):
-            uniques = sorted(set(X[c]))
-            uniques, counts = X[c].value_counts(dropna=False)
-
-            local_epsilon = self.epsilon / X.shape[1]
-            self.marginals_[c] = dp_marginal_distribution(X[c], local_epsilon)
-
-            # get numeric values - store encoder for inverse transform
-            self._ordinalencoders[c] = OrdinalEncoder().fit(X[c])
-            X_enc[:, jj] = self._ordinalencoders[c].transform(X[c])
+            # marginal_candidates =
+            #
+            # self.marginals_[c]
+        X_inv = self._ordinalencoder.inverse_transform(X_enc)
 
 
-        return super().fit(X_enc, y)
-
-    def inverse_transform(self, Xt):
-        X_enc = super().inverse_transform(Xt)
-        for jj in range(X_enc.shape[1]):
-            # todo fix column names indexing
-            # todo ensure inverse gives back X_enc which OrdinalEncoder.inverse_transform(X_le)
-            pass
+# class GeneralizeCategorical(GeneralizeContinuous):
+#
+#     def __init__(self, epsilon=1.0, n_bins=10, strategy='uniform', labeled_missing=None):
+#         super().__init__(n_bins=n_bins, strategy=strategy, encode='ordinal')
+#         self.epsilon = epsilon
+#
+#     def fit(self, X, y=None):
+#         # if user-specified bins in form of iterable or dict
+#         if self.bins:
+#             pass
+#
+#         self.marginals_ = {}
+#         self._ordinalencoders = {}
+#         X_enc = np.empty_like(X)
+#         for jj, c in enumerate(X.columns):
+#             uniques = sorted(set(X[c]))
+#             uniques, counts = X[c].value_counts(dropna=False)
+#
+#             local_epsilon = self.epsilon / X.shape[1]
+#             self.marginals_[c] = dp_marginal_distribution(X[c], local_epsilon)
+#
+#             # get numeric values - store encoder for inverse transform
+#             self._ordinalencoders[c] = OrdinalEncoder().fit(X[c])
+#             X_enc[:, jj] = self._ordinalencoders[c].transform(X[c])
+#
+#
+#         return super().fit(X_enc, y)
+#
+#     def inverse_transform(self, Xt):
+#         X_enc = super().inverse_transform(Xt)
+#         for jj in range(X_enc.shape[1]):
+#             # todo fix column names indexing
+#             # todo ensure inverse gives back X_enc which OrdinalEncoder.inverse_transform(X_le)
+#             pass
 
 
 
@@ -262,20 +262,25 @@ class GeneralizeCategorical(GeneralizeContinuous):
 
 
 if __name__ == '__main__':
-    data_path = Path("c:/data/1_iknl/processed/bente/cc_9col.csv")
-    X = pd.read_csv(data_path)
-    columns = ['tum_topo_sublokalisatie_code', 'tum_differentiatiegraad_code', 'tum_lymfklieren_positief_atl']
-    # columns = ['tum_lymfklieren_positief_atl']
-    X = X.loc[:, columns]
-    print(X.head(20))
+    # data_path = Path("c:/data/1_iknl/processed/bente/cc_9col.csv")
+    # X = pd.read_csv(data_path)
+    # columns = ['tum_topo_sublokalisatie_code', 'tum_differentiatiegraad_code', 'tum_lymfklieren_positief_atl']
+    # # columns = ['tum_lymfklieren_positief_atl']
+    # X = X.loc[:, columns]
+    # print(X.head(20))
+    #
+    # gen_cont = GeneralizeContinuous(n_bins=10, strategy='quantile', labeled_missing=[999])
+    # # X = X.dropna()
+    #
+    # gen_cont.fit(X)
+    # X_cat = gen_cont.transform(X)
+    # print(X_cat)
+    #
+    # X_inv = gen_cont.inverse_transform(X_cat)
+    # print(X_inv)
+    # print(gen_cont.bin_edges_)
 
-    gen_cont = GeneralizeContinuous(n_bins=10, strategy='quantile', labeled_missing=[999])
-    # X = X.dropna()
-
-    gen_cont.fit(X)
-    X_cat = gen_cont.transform(X)
-    print(X_cat)
-
-    X_inv = gen_cont.inverse_transform(X_cat)
-    print(X_inv)
-    print(gen_cont.bin_edges_)
+    data_path = here("examples/data/input/adult.csv")
+    df = pd.read_csv(data_path, delimiter=', ').astype(str)
+    print(df.head())
+    df_s = df[['native-country', 'occupation']]
