@@ -21,12 +21,12 @@ def plot_feature_distances(x1, x2, labels=None):
     plt.show()
 
 
-def compare_synthetic_data(df_real, df_synth):
-    df_real = df_real.astype(str)
-    df_synth = df_synth.astype(str)
-    for c in df_real.columns:
-        df_compare = pd.concat([df_real[c].value_counts(), df_synth[c].value_counts()], axis=1, sort=True)
-        df_compare.columns = ['real', 'synthetic']
+def compare_value_counts(x1, x2):
+    x1 = x1.astype(str)
+    x2 = x2.astype(str)
+    for c in x1.columns:
+        df_compare = pd.concat([x1[c].value_counts(), x2[c].value_counts()], axis=1, sort=True)
+        df_compare.columns = ['x1', 'x2']
 
         print('='*100)
         print(c)

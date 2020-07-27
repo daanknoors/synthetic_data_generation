@@ -15,6 +15,7 @@ from sklearn.utils.validation import check_array, check_is_fitted, FLOAT_DTYPES
 from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
 
 from synthesis.tools.dp_utils import dp_marginal_distribution
+from synthesis.evaluation import visual
 
 
 class GeneralizeContinuous(KBinsDiscretizer):
@@ -170,7 +171,7 @@ class GeneralizeContinuous(KBinsDiscretizer):
 
 class GeneralizeCategorical(GeneralizeContinuous):
 
-    def __init__(self, epsilon=1.0, n_bins=10, strategy='uniform', labeled_missing=None):
+    def __init__(self, epsilon=1.0, n_bins=5, strategy='uniform', labeled_missing=None):
         super().__init__(n_bins=n_bins, strategy=strategy)
         self.epsilon = epsilon
 
@@ -188,6 +189,7 @@ class GeneralizeCategorical(GeneralizeContinuous):
         X_enc = pd.DataFrame(X_enc, columns=X.columns)
 
         # get dp marginal of encoded feature
+        # todo turn into list of arrays
         self.marginals_ = {}
         for jj, c in enumerate(X.columns):
             self.marginals_[c] = dp_marginal_distribution(X_enc.loc[:, c], local_epsilon).sort_index()
@@ -210,15 +212,34 @@ class GeneralizeCategorical(GeneralizeContinuous):
 
         for jj, c in enumerate(Xt.columns):
             bin_edges = self.bin_edges_[jj]
+            marginals = self.marginals_[c]
             lower_bounds = bin_edges[np.int_(X_enc[:, jj])]
             upper_bounds = bin_edges[np.int_(X_enc[:, jj]) + 1]
-            for i in n_records:
-                self.marginals_[c].values()
 
-            # marginal_candidates =
-            #
-            # self.marginals_[c]
+            for i in range(n_records):
+                # Values which are close to a bin edge are susceptible to numeric
+                # instability. Add eps to X so these values are binned correctly
+                # with respect to their decimal truncation. See documentation of
+                # numpy.isclose for an explanation of ``rtol`` and ``atol``.
+                rtol = 1.e-5
+                atol = 1.e-8
+                eps = atol + rtol * np.abs(upper_bounds[i])
+                try:
+                    marginal_candidates = marginals[
+                        (marginals.keys() >= lower_bounds[i]) &
+                        (marginals.keys() < upper_bounds[i] + eps)]
+                except:
+                    print('error1')
+
+                marginal_candidates_normalized = marginal_candidates / marginal_candidates.sum()
+                # sample encoded (numerical) value based on marginal probabilities
+                try:
+                    X_enc[i, jj] = np.random.choice(list(marginal_candidates.keys()), p=marginal_candidates_normalized.values)
+                except:
+                    print('error2')
+        # inverse transform numerical value to original categorical
         X_inv = self._ordinalencoder.inverse_transform(X_enc)
+        return X_inv
 
 
 # class GeneralizeCategorical(GeneralizeContinuous):
@@ -284,3 +305,12 @@ if __name__ == '__main__':
     df = pd.read_csv(data_path, delimiter=', ').astype(str)
     print(df.head())
     df_s = df[['native-country', 'occupation']]
+
+    gen_cat = GeneralizeCategorical(epsilon=100, n_bins=10)
+    gen_cat.fit(df_s)
+    df_sT = gen_cat.transform(df_s)
+    df_sT = pd.DataFrame(df_sT, columns=df_s.columns)
+
+    df_sI = pd.DataFrame(gen_cat.inverse_transform(df_sT), columns=df_s.columns)
+
+    visual.compare_value_counts(df_s, df_sI)

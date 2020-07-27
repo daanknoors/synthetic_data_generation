@@ -408,5 +408,5 @@ if __name__ == "__main__":
     pbfix_copy = deepcopy(pbfix)
 
 
-    # df_synth = df.copy() # todo should really be synth
+    # x2 = df.copy() # todo should really be synth
     df_synth_tuned = pbfix.transform(df_synth[['age', 'education']])

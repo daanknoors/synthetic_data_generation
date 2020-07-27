@@ -195,9 +195,9 @@ class MarginalSynthesizer(BaseEstimator, TransformerMixin):
 
 def compare_synthetic_data(X, y):
     for c in X.columns:
-        # counts_real = df_real[c].value_counts().sort_index()
+        # counts_real = x1[c].value_counts().sort_index()
         # # in case the synth dataset did not sample certain attribute values from the real data we assign a count of 0
-        # _, counts_synth = counts_real.align(df_synth[c].value_counts(), join='left', axis=0, fill_value=0)
+        # _, counts_synth = counts_real.align(x2[c].value_counts(), join='left', axis=0, fill_value=0)
         counts_X, counts_y = X[c].value_counts(dropna=False).align(y[c].value_counts(dropna=False), join='outer',
                                                                    axis=0, fill_value=0)
         df_compare = pd.concat([counts_X, counts_y], axis=1)
