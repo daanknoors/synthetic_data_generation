@@ -186,13 +186,12 @@ class GeneralizeCategorical(GeneralizeContinuous):
         self._ordinalencoder = OrdinalEncoder().fit(X)
         #todo: turn into numpy -> df needed for marginal distribution
         X_enc = self._ordinalencoder.transform(X)
-        X_enc = pd.DataFrame(X_enc, columns=X.columns)
 
         # get dp marginal of encoded feature
         # todo turn into list of arrays
-        self.marginals_ = {}
-        for jj, c in enumerate(X.columns):
-            self.marginals_[c] = dp_marginal_distribution(X_enc.loc[:, c], local_epsilon).sort_index()
+        self.marginals_ = []
+        for jj in range(X.shape[1]):
+            self.marginals_.append(dp_marginal_distribution(X_enc.loc[:, jj], local_epsilon).sort_index())
 
         return super().fit(X_enc, y)
 
@@ -212,7 +211,7 @@ class GeneralizeCategorical(GeneralizeContinuous):
 
         for jj, c in enumerate(Xt.columns):
             bin_edges = self.bin_edges_[jj]
-            marginals = self.marginals_[c]
+            marginals = self.marginals_[jj]
             lower_bounds = bin_edges[np.int_(X_enc[:, jj])]
             upper_bounds = bin_edges[np.int_(X_enc[:, jj]) + 1]
 

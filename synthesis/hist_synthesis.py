@@ -156,6 +156,7 @@ class MarginalSynthesizer(BaseEstimator, TransformerMixin):
 
     def fit(self, X, y=None):
         if hasattr(self, 'schema_'):
+            print('Schema is already fitted')
             return self
 
         self._n_records, self._n_columns = X.shape
@@ -176,8 +177,10 @@ class MarginalSynthesizer(BaseEstimator, TransformerMixin):
         return pd.DataFrame(Xt)
 
     def get_schema(self, X):
+        X = X.astype(str)
         local_epsilon = self.epsilon / X.shape[1]
         self.schema_ = {}
+
         for c in X.columns:
             # note that in Python 3 dicts remember insertion order - thus no need to use ordered dict
             marginal = dp_utils.dp_marginal_distribution(X[c], local_epsilon)
