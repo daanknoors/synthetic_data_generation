@@ -10,6 +10,7 @@ from sklearn.utils import check_random_state
 from scipy.spatial.distance import jensenshannon
 
 from synthesis.tools import dp_utils
+from synthesis.evaluation import visual
 
 
 class HistSynthesizer(BaseEstimator, TransformerMixin):
@@ -158,6 +159,7 @@ class MarginalSynthesizer(BaseEstimator, TransformerMixin):
         if hasattr(self, 'schema_'):
             print('Schema is already fitted')
             return self
+        X = X.copy().astype(str)
 
         self._n_records, self._n_columns = X.shape
         self.get_schema(X)
@@ -177,7 +179,6 @@ class MarginalSynthesizer(BaseEstimator, TransformerMixin):
         return pd.DataFrame(Xt)
 
     def get_schema(self, X):
-        X = X.astype(str)
         local_epsilon = self.epsilon / X.shape[1]
         self.schema_ = {}
 
@@ -196,22 +197,6 @@ class MarginalSynthesizer(BaseEstimator, TransformerMixin):
         return self
 
 
-def compare_synthetic_data(X, y):
-    for c in X.columns:
-        # counts_real = x1[c].value_counts().sort_index()
-        # # in case the synth dataset did not sample certain attribute values from the real data we assign a count of 0
-        # _, counts_synth = counts_real.align(x2[c].value_counts(), join='left', axis=0, fill_value=0)
-        counts_X, counts_y = X[c].value_counts(dropna=False).align(y[c].value_counts(dropna=False), join='outer',
-                                                                   axis=0, fill_value=0)
-        df_compare = pd.concat([counts_X, counts_y], axis=1)
-        df_compare.columns = ['real', 'synthetic']
-
-        print('='*100)
-        print(c)
-        print(df_compare)
-
-
-
 if __name__ == '__main__':
     # data_path = r"c:/data/1_iknl/processed/crc_stage_subsettumor.csv"
     # data_path = r"c:/data/1_iknl/raw/jrc/CancerCases_NL_nov2016.csv"
@@ -228,12 +213,12 @@ if __name__ == '__main__':
     df_synth = hist_synthesizer.transform(df)
     print(df_synth.head())
 
-    compare_synthetic_data(df, df_synth)
+    visual.compare_value_counts(df, df_synth)
 
 
     con_hist = ConditionalHistSynthesizer(epsilon=float(np.inf))
     con_hist.fit(df)
     df_synth_tuned = con_hist.transform(df_synth.loc[:, 'age'])
-    compare_synthetic_data(df, df_synth_tuned)
+    visual.compare_value_counts(df, df_synth_tuned)
 
 
