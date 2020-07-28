@@ -182,16 +182,17 @@ class GeneralizeCategorical(GeneralizeContinuous):
         2. Store DP marginal counts for optional inverse transform
         3. Run super().fit() to get groups
         """
-        local_epsilon = self.epsilon / X.shape[1]
         self._ordinalencoder = OrdinalEncoder().fit(X)
         #todo: turn into numpy -> df needed for marginal distribution
         X_enc = self._ordinalencoder.transform(X)
+        X_enc = pd.DataFrame(X_enc, columns=X.columns)
 
         # get dp marginal of encoded feature
         # todo turn into list of arrays
+        local_epsilon = self.epsilon / X.shape[1]
         self.marginals_ = []
-        for jj in range(X.shape[1]):
-            self.marginals_.append(dp_marginal_distribution(X_enc.loc[:, jj], local_epsilon).sort_index())
+        for jj, c in enumerate(X.columns):
+            self.marginals_.append(dp_marginal_distribution(X_enc.loc[:, c], local_epsilon).values)
 
         return super().fit(X_enc, y)
 
@@ -209,33 +210,51 @@ class GeneralizeCategorical(GeneralizeContinuous):
             raise ValueError("Incorrect number of features. Expecting {}, "
                              "received {}.".format(n_features, X_enc.shape[1]))
 
+
+        self._marginal_group_alloc = []
+
         for jj, c in enumerate(Xt.columns):
             bin_edges = self.bin_edges_[jj]
             marginals = self.marginals_[jj]
-            lower_bounds = bin_edges[np.int_(X_enc[:, jj])]
-            upper_bounds = bin_edges[np.int_(X_enc[:, jj]) + 1]
+            marginals_idx = np.arange(len(marginals))
+
+            rtol = 1.e-5
+            atol = 1.e-8
+            eps = atol + rtol * np.abs(marginals)
+            marginal_group_alloc = np.digitize(marginals_idx + eps, bin_edges[1:])
+            np.clip(marginal_group_alloc, 0, self.n_bins_[jj] - 1, out=marginal_group_alloc)
+
+            self._marginal_group_alloc.append(marginal_group_alloc)
+
+            # lower_bounds = np.int_(bin_edges[np.int_(X_enc[:, jj])])
+            # upper_bounds = np.int_(bin_edges[np.int_(X_enc[:, jj]) + 1])
 
             for i in range(n_records):
                 # Values which are close to a bin edge are susceptible to numeric
                 # instability. Add eps to X so these values are binned correctly
                 # with respect to their decimal truncation. See documentation of
                 # numpy.isclose for an explanation of ``rtol`` and ``atol``.
-                rtol = 1.e-5
-                atol = 1.e-8
-                eps = atol + rtol * np.abs(upper_bounds[i])
-                try:
-                    marginal_candidates = marginals[
-                        (marginals.keys() >= lower_bounds[i]) &
-                        (marginals.keys() < upper_bounds[i] + eps)]
-                except:
-                    print('error1')
+                # rtol = 1.e-5
+                # atol = 1.e-8
+                # eps = atol + rtol * np.abs(upper_bounds[i])
+                # marginal_candidates = marginals[
+                #     (marginals.keys() >= lower_bounds[i]) &
+                #     (marginals.keys() < upper_bounds[i] + eps)]
 
-                marginal_candidates_normalized = marginal_candidates / marginal_candidates.sum()
+                #np.where returns 1d tuple, thus index 0
+                marginal_candidate_idx = np.where(X_enc[i, jj] == marginal_group_alloc)[0]
+                marginal_candidate_probs = marginals[marginal_candidate_idx]
+                marginal_candidate_probs_normalized = marginal_candidate_probs / marginal_candidate_probs.sum()
+
+                # marginal_idx = np.arange(lower_bounds[i], upper_bounds[i])
+                # marginal_probs = marginals[marginal_idx]
+
+                # marginal_probs_normalized = marginal_probs / marginal_probs.sum()
                 # sample encoded (numerical) value based on marginal probabilities
-                try:
-                    X_enc[i, jj] = np.random.choice(list(marginal_candidates.keys()), p=marginal_candidates_normalized.values)
-                except:
-                    print('error2')
+                X_enc[i, jj] = np.random.choice(marginal_candidate_idx, p=marginal_candidate_probs_normalized)
+
+                # X_enc[i, jj] = np.random.choice(list(marginal_candidates.keys()), p=marginal_candidates_normalized.values)
+
         # inverse transform numerical value to original categorical
         X_inv = self._ordinalencoder.inverse_transform(X_enc)
         return X_inv
@@ -305,7 +324,9 @@ if __name__ == '__main__':
     print(df.head())
     df_s = df[['native-country', 'occupation']]
 
-    gen_cat = GeneralizeCategorical(epsilon=100, n_bins=10)
+    # epsilon = float(np.inf)
+    epsilon = 0.1
+    gen_cat = GeneralizeCategorical(epsilon=epsilon, n_bins=5)
     gen_cat.fit(df_s)
     df_sT = gen_cat.transform(df_s)
     df_sT = pd.DataFrame(df_sT, columns=df_s.columns)
