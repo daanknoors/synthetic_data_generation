@@ -38,22 +38,22 @@ class PrivBayes(BaseEstimator, TransformerMixin):
     """PrivBayes: generate data based on DP Bayesian Network"""
 
     def __init__(self, epsilon: float = 1.0, degree_network=None,
-                 theta_usefulness=4, score_function='mi', random_state=None):
+                 theta_usefulness=4, score_function='mi', random_state=None,
+                 epsilon_split=0.4):
         self.epsilon = epsilon
-        self.k = degree_network
-        self.theta = theta_usefulness
+        self.degree_network = degree_network
+        self.theta_usefulness = theta_usefulness
         self.score_function = score_function
         self.random_state = random_state
         # todo fix arg epsilon_split to work in pipeline
-        self.epsilon_split = [0.4, 0.6]
-        # if epsilon_split is None:
-        #     self.epsilon_split = [0.4, 0.6]
-        # else:
-        #     if isinstance(epsilon_split, float):
-        #         epsilon_split = [epsilon_split, 1-epsilon_split]
-        #     self.epsilon_split = list(epsilon_split)
+        self.epsilon_split = epsilon_split
 
     def fit(self, X, y=None):
+        assert (self.degree_network is None) or (self.degree_network < X.shape[1]), "degree of network needs to be lower than number of columns in X"
+        self._check_init_args(X)
+        # converts to dataframe and make all columns categorical.
+        X = pd.DataFrame(X).astype(str, copy=False)
+
         self._n_records, self._n_columns = X.shape
         # X = X.loc[columns] if columns is not None else X
         self.random_state_ = check_random_state(self.random_state)
@@ -71,13 +71,22 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         print("\n Synthetic Data Generated")
         return Xt
 
-    def _greedy_bayes(self, X):
-        X = X.astype(str, copy=False)
-        n_records, n_columns = X.shape
+    def _check_init_args(self, X):
+        if self.epsilon_split is None:
+            self.epsilon_split = [0.4, 0.6]
+        else:
+            if isinstance(self.epsilon_split, float):
+                self.epsilon_split = [self.epsilon_split, 1-self.epsilon_split]
+            self.epsilon_split = list(self.epsilon_split)
 
-        if not self.k:
-            self.k = self._compute_degree_network(n_records, n_columns)
-        print("1/{} - Degree of network (k): {}\n".format(n_columns, self.k))
+        n_records, n_columns = X.shape
+        if not self.degree_network:
+            self.degree_network = self._compute_degree_network(n_records, n_columns)
+        print("1/{} - Degree of network (k): {}\n".format(n_columns, self.degree_network))
+
+
+    def _greedy_bayes(self, X):
+        n_records, n_columns = X.shape
 
         nodes, nodes_selected = self._init_network(X)
         # normally equal to n_columns - 1 as only the root is selected, unless user implements new
@@ -88,7 +97,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
             print("{}/{} - Evaluating next node to add to network".format(i+1, n_columns))
 
             nodes_remaining = nodes - nodes_selected
-            n_parents = min(self.k, len(nodes_selected))
+            n_parents = min(self.degree_network, len(nodes_selected))
 
             node_parent_pairs = [
                 NodeParentPair(n, tuple(p)) for n in nodes_remaining
@@ -214,18 +223,18 @@ class PrivBayes(BaseEstimator, TransformerMixin):
             # avg_scale_info = self.epsilon * (1 - self.epsilon_split[0]) * n_records
             avg_scale_info = self.epsilon * self.epsilon_split[1] * n_records
             avg_scale_noise = (n_columns - k) * (2 ** (k + 2))
-            if (avg_scale_info / avg_scale_noise) >= self.theta:
+            if (avg_scale_info / avg_scale_noise) >= self.theta_usefulness:
                 break
             k -= 1
         return k
 
     def _compute_conditional_distributions(self, X):
         P = dict()
-        local_epsilon = self.epsilon * self.epsilon_split[1] / (self._n_columns - self.k)
+        local_epsilon = self.epsilon * self.epsilon_split[1] / (self._n_columns - self.degree_network)
 
         # first materialize noisy distributions for nodes who have a equal number of parents to the degree k.
         # earlier nodes can be inferred from these distributions without adding extra noise
-        for idx, pair in enumerate(self.network_[self.k:]):
+        for idx, pair in enumerate(self.network_[self.degree_network:]):
             print('Learning conditional probabilities: {} - with parents {}'.format(pair.node, pair.parents))
 
             attributes = [*pair.parents, pair.node]
@@ -243,7 +252,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         # for pair in self.network_[:self.k]:
 
         # go iteratively from node at k to root of network, sum out child nodes and get cpt.
-        for pair in reversed(self.network_[:self.k]):
+        for pair in reversed(self.network_[:self.degree_network]):
             print('Learning conditional probabilities: {} - with parents {}'.format(pair.node, pair.parents))
 
             # infer_from_distribution = infer_from_distribution.sum_out(pair.node)
@@ -291,7 +300,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
                     print('----')
                     raise ValueError
 
-            sampled_node_value = np.random.choice(node.states, p=node_cpt)
+            sampled_node_value = np.random.choice(node.states, p=node_cpt.values)
 
             record[node.name] = sampled_node_value
 
@@ -317,6 +326,8 @@ class PrivBayesFix(PrivBayes):
     #     print("Root of network: {}".format(root))
 
     def fit(self, X, y=None):
+        assert hasattr(self, '_fix_columns'), "first call set_network and fix_columns to fix columns " \
+                                              "prior to generating data"
         self._header = list(X.columns)
         return super().fit(X, y)
 
@@ -332,7 +343,7 @@ class PrivBayesFix(PrivBayes):
 
         for i in range(n_records):
             print('Number of records generated: {} / {}'.format(i+1, n_records), end='\r')
-            record_init = X.iloc[i].to_dict()
+            record_init = self._fix_columns.loc[i].to_dict()
             record = self._sample_record(record_init)
             Xt[i] = list(record.values())
 
@@ -340,7 +351,15 @@ class PrivBayesFix(PrivBayes):
         df_synth = pd.DataFrame(Xt, columns=[c.node for c in self.network_])[self._header]
         return df_synth
 
+    def fix_columns(self, fix_columns):
+        assert hasattr(self, 'network_'), "use set_network with X_fix columns before defining" \
+                                          "fixing columns"
+        network_init_nodes = [n.node for n in self.network_]
+        if not isinstance(fix_columns, pd.DataFrame):
+            fix_columns = pd.DataFrame(fix_columns)
 
+        assert set(fix_columns.columns) == set(network_init_nodes), "features in X_fix not set in set_network"
+        self._fix_columns = fix_columns.reset_index(drop=True)
 
     def _sample_record(self, record_init):
         # assume X has columns with values that correspond to the first nodes in the network
@@ -356,18 +375,19 @@ class PrivBayesFix(PrivBayes):
             node_cpt = node.cpt
             for parent in node.conditioning:
                 parent_value = record[parent]
-                # node_cpt = node_cpt[parent_value]
-                try:
-                    node_cpt = node_cpt[parent_value]
-                except:
-                    print(record)
-                    print(node)
-                    print(node_cpt)
-                    print("parent: {} - {}".format(parent, parent_value))
-                    print('----')
-                    raise ValueError
-
-            sampled_node_value = np.random.choice(node.states, p=node_cpt)
+                node_cpt = node_cpt[parent_value]
+                # try:
+                #     node_cpt = node_cpt[parent_value]
+                # except:
+                #     print(record)
+                #     print(node)
+                #     print(node_cpt)
+                #     print("parent: {} - {}".format(parent, parent_value))
+                #     print('----')
+                #     raise ValueError
+            # print(node.states)
+            # print(node_cpt.values)
+            sampled_node_value = np.random.choice(node.states, p=node_cpt.values)
 
             record[node.name] = sampled_node_value
 

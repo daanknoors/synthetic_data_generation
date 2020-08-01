@@ -39,7 +39,7 @@ def dp_contingency_table(X, epsilon=1.0, range=None):
 
     for i in np.arange(dp_contingency_table.shape[0]):
         # round counts upwards to preserve bins with noisy count between [0, 1]
-        dp_contingency_table[i] = np.ceil(dp_mech.randomise(contingency_table_[i]))
+        dp_contingency_table[i] = np.ceil(dp_mech.randomise(contingency_table_.values[i]))
 
     # noise can result into negative counts, thus set boundary at 0
     # dp_contingency_table[dp_contingency_table < 0] = 0
@@ -61,7 +61,7 @@ def dp_marginal_distribution(X, epsilon=1.0, range=None):
 
     for i in np.arange(dp_marginal.shape[0]):
         # round counts upwards to preserve bins with noisy count between [0, 1]
-        dp_marginal[i] = dp_mech.randomise(marginal[i])
+        dp_marginal[i] = dp_mech.randomise(marginal.values[i])
 
     # noise can result into negative counts, thus set boundary at 0
     dp_marginal = np.clip(dp_marginal, a_min=0, a_max=None)
@@ -89,7 +89,8 @@ def dp_joint_distribution(X, epsilon=1.0, range=None):
     dp_joint_distribution_ = np.zeros_like(joint_distribution_.values)
 
     for i in np.arange(dp_joint_distribution_.shape[0]):
-        dp_joint_distribution_[i] = dp_mech.randomise(joint_distribution_[i])
+        dp_joint_distribution_[i] = dp_mech.randomise(joint_distribution_.values[i])
+
 
     # laplacian_noise = np.random.laplace(0, scale=sensitivity / epsilon, size=joint_distribution_.shape[0])
     # dp_joint_distribution = joint_distribution_ + laplacian_noise

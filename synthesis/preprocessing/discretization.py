@@ -146,6 +146,7 @@ class GeneralizeContinuous(KBinsDiscretizer):
 
     def inverse_transform(self, Xt):
         # check_is_fitted(self)
+        assert set(Xt.columns) == set(self.feature_names), "input contains different columns than seen in fit"
 
         Xinv = check_array(Xt, copy=True, dtype=FLOAT_DTYPES, force_all_finite='allow-nan')
         # Xinv = Xt.copy()
@@ -202,6 +203,7 @@ class GeneralizeCategorical(GeneralizeContinuous):
         return super().transform(X_enc)
 
     def inverse_transform(self, Xt):
+        assert set(Xt.columns) == set(self.feature_names), "input contains different columns than seen in fit"
 
         X_enc = check_array(Xt, copy=True, dtype=FLOAT_DTYPES, force_all_finite='allow-nan')
         # Xinv = Xt.copy()
@@ -296,7 +298,13 @@ class GeneralizeCategorical(GeneralizeContinuous):
 #             pass
 
 
-
+def get_high_cardinality_features(df, threshold=50):
+    """Get features with more unique values than the specified threshold."""
+    high_cardinality_features = []
+    for c in df.columns:
+        if df[c].nunique() > threshold:
+            high_cardinality_features.append(c)
+    return high_cardinality_features
 
 
 

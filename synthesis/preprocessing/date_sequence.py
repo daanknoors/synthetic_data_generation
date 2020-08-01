@@ -30,6 +30,10 @@ class GeneralizeDateSequence(TransformerMixin, BaseEstimator):
         self : object
             Returns self.
         """
+        if self.date_sequence is None:
+            self.date_sequence = X.columns
+            print("no data_sequence specified in init - assume columns in X "
+                  "represent the ordered data sequence")
         return self
 
     def transform(self, X, y=None):
