@@ -250,8 +250,10 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         # first materialize noisy distributions for nodes who have a equal number of parents to the degree k.
         # earlier nodes can be inferred from these distributions without adding extra noise
         for idx, pair in enumerate(self.network_[self.degree_network:]):
-            print('Learning conditional probabilities: {} - with parents {}'.format(pair.node, pair.parents))
-
+            cpt_size = utils.get_size_contingency_table(X[[*pair.parents, pair.node]])
+            print('Learning conditional probabilities: {} - with parents {} ~ estimated size: {}'.format(pair.node,
+                                                                                                         pair.parents,
+                                                                                                         cpt_size))
             attributes = [*pair.parents, pair.node]
             dp_joint_distribution = dp_utils.dp_joint_distribution(X[attributes], epsilon=local_epsilon)
             # dp_joint_distribution = utils.joint_distribution(X[attributes])
@@ -268,8 +270,15 @@ class PrivBayes(BaseEstimator, TransformerMixin):
 
         # go iteratively from node at k to root of network, sum out child nodes and get cpt.
         for pair in reversed(self.network_[:self.degree_network]):
-            print('Learning conditional probabilities: {} - with parents {}'.format(pair.node, pair.parents))
+            if pair.parents is not None:
+                attributes = [*pair.parents, pair.node]
+            else:
+                attributes = [pair.node]
+            cpt_size = utils.get_size_contingency_table(X[attributes])
 
+            print('Learning conditional probabilities: {} - with parents {} ~ estimated size: {}'.format(pair.node,
+                                                                                                         pair.parents,
+                                                                                                         cpt_size))
             # infer_from_distribution = infer_from_distribution.sum_out(pair.node)
             # conditioned_var = pair.parents[-1]
             cpt = CPT(infer_from_distribution, conditioned_variables=[pair.node])

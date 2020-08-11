@@ -46,7 +46,7 @@ class MetaSynthesizer(BaseEstimator, TransformerMixin):
         2. fit_transform of cat, cont, date
         3. fit synthesis algorithm on variable groupings - identify linking variables
         """
-        self._check_init()
+        self._check_init(X)
         X = self._check_input_data(X)
         # converts to dataframe in case of numpy input and make all columns categorical.
         X = pd.DataFrame(X).astype(str)
@@ -93,20 +93,25 @@ class MetaSynthesizer(BaseEstimator, TransformerMixin):
             Xs_inv[features] = discetizer.inverse_transform(Xs_inv[features])
         return Xs_inv
 
-    def _check_init(self):
-        self.categorical_vars = set(self.categorical_vars) if self.categorical_vars is not None else None
-        self.continuous_vars = set(self.continuous_vars) if self.continuous_vars is not None else None
+    def _check_init(self, X):
+        self.categorical_vars = list(set(self.categorical_vars)) if self.categorical_vars is not None else None
+        self.continuous_vars = list(set(self.continuous_vars)) if self.continuous_vars is not None else None
 
         self.fitted_columns_ = set()
         self.linking_variables_ = []
+        # todo fix the identification of linking variables
+        if self.variable_group_order is not None:
+            for group in self.variable_group_order:
+                linking_variable = list(self.fitted_columns_.intersection(set(group)))
+                print(linking_variable)
+                assert linking_variable is None or len(linking_variable) < 2, "can only have 1 overlapping (linking) column between groups"
+                linking_variable = list(linking_variable)[0] if bool(linking_variable) else None
 
-        for group in self.variable_group_order:
-            linking_variable = list(self.fitted_columns_.intersection(set(group)))
-            assert len(linking_variable) < 2, "can only have 1 overlapping (linking) column between groups"
-            linking_variable = list(linking_variable)[0] if bool(linking_variable) else None
-
-            self.linking_variables_.append(linking_variable)
-            self.fitted_columns_.update(set(group))
+                self.linking_variables_.append(linking_variable)
+                self.fitted_columns_.update(set(group))
+        else:
+            self.variable_group_order = [list(X.columns)]
+            self.linking_variables_.append(None)
         return self
 
     def _check_input_data(self, X):
@@ -119,6 +124,7 @@ class MetaSynthesizer(BaseEstimator, TransformerMixin):
             assert set(X.columns) == set(self._header), "input contains different columns than seen in fit"
         else:
             self._header = list(X.columns)
+
         return X
 
     def _distribute_epsilon(self):

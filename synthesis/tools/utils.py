@@ -65,6 +65,13 @@ def normalize_cpt(cpt, dropna=False):
     cpt_norm_full = cpt_norm_full.fillna(uniform_prob)
     return CPT(cpt_norm_full)
 
+def get_size_contingency_table(X):
+    """Get size of contingency table prior to calculating it"""
+    size = 1
+    for jj in X.columns:
+        size *= X[jj].nunique()
+    return size
+
 
 # def contingency_table(X):
 #     """Represent data as contingency table of all attributes"""

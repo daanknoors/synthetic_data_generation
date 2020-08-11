@@ -135,10 +135,16 @@ class GeneralizeContinuous(KBinsDiscretizer):
         self.float_columns = []
 
         for c in X.columns:
-            if np.array_equal(X[c].dropna(), X[c].dropna().astype(int)):
+            only_integers = (X[c].dropna().astype(float) % 1 == 0).all()
+            if only_integers:
                 self.integer_columns.append(c)
             else:
                 self.float_columns.append(c)
+            # conversion from string to int directly can cause ValueError
+            # if np.array_equal(X[c].dropna(), X[c].dropna().astype(float).astype(int)):
+            #     self.integer_columns.append(c)
+            # else:
+            #     self.float_columns.append(c)
 
     def _get_missing_idx(self, column):
         return np.isnan(column) | np.isin(column, self.labeled_missing)
