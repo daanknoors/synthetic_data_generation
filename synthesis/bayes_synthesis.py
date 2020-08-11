@@ -436,7 +436,7 @@ if __name__ == "__main__":
 
     pb_copy = deepcopy(pb)
 
-    df_synth = pb.transform(df, n_records=1000)
+    df_synth = pb.transform(df)
     df_synth.head()
     
     # fixing a network - specify init network to fix those variables when generating
