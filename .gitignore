@@ -117,5 +117,6 @@ venv.bak/
 **/examples/models
 examples/data/input/chicago_crimes_2012_2017.csv
 **/experiments
+//doc
 
 *.ctl
