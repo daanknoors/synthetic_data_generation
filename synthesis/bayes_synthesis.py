@@ -39,22 +39,23 @@ class PrivBayes(BaseEstimator, TransformerMixin):
 
     def __init__(self, epsilon: float = 1.0, degree_network=None,
                  theta_usefulness=4, score_function='mi', random_state=None,
-                 epsilon_split=0.4):
+                 epsilon_split=0.4, n_records_synth=None, network_init=None):
         self.epsilon = epsilon
         self.degree_network = degree_network
         self.theta_usefulness = theta_usefulness
         self.score_function = score_function
         self.random_state = random_state
-        # todo fix arg epsilon_split to work in pipeline
         self.epsilon_split = epsilon_split
+        self.n_records_synth = n_records_synth
+        self.network_init = network_init
 
     def fit(self, X, y=None):
-        assert (self.degree_network is None) or (self.degree_network < X.shape[1]), "degree of network needs to be lower than number of columns in X"
+        assert (self.degree_network is None) or (self.degree_network < X.shape[1]), "degree of network > " \
+                                                                                    "number of columns in X"
         self._check_init_args(X)
-        # converts to dataframe and make all columns categorical.
-        X = pd.DataFrame(X).astype(str, copy=False)
+        X = self._check_input_data(X)
 
-        self._n_records, self._n_columns = X.shape
+        self._n_records_fit, self._n_columns_fit = X.shape
         # X = X.loc[columns] if columns is not None else X
         self.random_state_ = check_random_state(self.random_state)
         # todo integrate random state
@@ -64,12 +65,25 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         self.bayesian_network_ = BayesianNetwork.from_CPTs('PrivBayes', self.cpt_.values())
         return self
 
-    def transform(self, X, n_records=None):
-        n_records = self._n_records if n_records is None else n_records
-
+    def transform(self, X):
+        # n_records = self._n_records_fit if n_records is None else n_records
+        n_records = self.n_records_synth if self.n_records_synth is not None else self._n_records_fit
+        X = self._check_input_data(X)
         Xt = self._generate_data(X, n_records)
         print("\n Synthetic Data Generated")
         return Xt
+
+    def _check_input_data(self, X):
+        # converts to dataframe in case of numpy input and make all columns categorical.
+        X = pd.DataFrame(X).astype(str, copy=False)
+        assert X.shape[1] > 1, "input needs at least 2 columns"
+        # prevent integer column indexing issues
+        X.columns = X.columns.astype(str)
+        if hasattr(self, '_header'):
+            assert set(X.columns) == set(self._header), "input contains different columns than seen in fit"
+        else:
+            self._header = list(X.columns)
+        return X
 
     def _check_init_args(self, X):
         if self.epsilon_split is None:
@@ -83,7 +97,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         if not self.degree_network:
             self.degree_network = self._compute_degree_network(n_records, n_columns)
         print("1/{} - Degree of network (k): {}\n".format(n_columns, self.degree_network))
-
+        return self
 
     def _greedy_bayes(self, X):
         n_records, n_columns = X.shape
@@ -121,12 +135,13 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         self._binary_columns = [c for c in X.columns if X[c].unique().size <= 2]
         nodes = set(X.columns)
 
-        if hasattr(self, 'network_'):
-            nodes_selected = set(n.node for n in self.network_)
+        if self.network_init is not None:
+            nodes_selected = set(n.node for n in self.network_init)
             # print("Pre-defined network init: {}".format(self.network_))
-            for i, pair in enumerate(self.network_):
-                print("{}/{} - init node {} - with parents: {}".format(i+1, len(self.network_),
+            for i, pair in enumerate(self.network_init):
+                print("{}/{} - init node {} - with parents: {}".format(i+1, len(self.network_init),
                                                                    pair.node, pair.parents))
+            self.network_ = self.network_init.copy()
             return nodes, nodes_selected
 
         # if set_network is not called we start with a random first node
@@ -142,7 +157,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
     def set_network(self, network):
         assert [isinstance(n, NodeParentPair) for n in network], "input network does not consists of " \
                                                                  "NodeParentPairs"
-        self.network_ = network
+        self.network_init = network
         return self
 
                     
@@ -230,7 +245,7 @@ class PrivBayes(BaseEstimator, TransformerMixin):
 
     def _compute_conditional_distributions(self, X):
         P = dict()
-        local_epsilon = self.epsilon * self.epsilon_split[1] / (self._n_columns - self.degree_network)
+        local_epsilon = self.epsilon * self.epsilon_split[1] / (self._n_columns_fit - self.degree_network)
 
         # first materialize noisy distributions for nodes who have a equal number of parents to the degree k.
         # earlier nodes can be inferred from these distributions without adding extra noise
@@ -275,8 +290,8 @@ class PrivBayes(BaseEstimator, TransformerMixin):
             Xt[i] = list(record.values())
 
         # np to df with original column ordering
-        df_synth = pd.DataFrame(Xt, columns=[c.node for c in self.network_])[X.columns]
-        return df_synth
+        Xs = pd.DataFrame(Xt, columns=[c.node for c in self.network_])[self._header]
+        return Xs
 
     def _sample_record(self):
         record = {}
@@ -310,8 +325,15 @@ class PrivBayes(BaseEstimator, TransformerMixin):
 class PrivBayesFix(PrivBayes):
 
     def __init__(self, epsilon: float = 1.0, degree_network=None,
-                 theta_usefulness=4, score_function='mi', random_state=None):
-        super().__init__(epsilon=epsilon, degree_network=degree_network)
+                 theta_usefulness=4, score_function='mi', random_state=None,
+                 epsilon_split=0.4, n_records_synth=None, network_init=None,
+                 fix_columns=None):
+        super().__init__(epsilon=epsilon, degree_network=degree_network,
+                         theta_usefulness=theta_usefulness, score_function=score_function,
+                         random_state=random_state,
+                         epsilon_split=epsilon_split, n_records_synth=n_records_synth,
+                         network_init=network_init)
+        self._fix_columns = fix_columns
 
     # def _init_network(self, X):
     #     # todo implement user-specified init network
@@ -326,14 +348,13 @@ class PrivBayesFix(PrivBayes):
     #     print("Root of network: {}".format(root))
 
     def fit(self, X, y=None):
-        assert hasattr(self, '_fix_columns'), "first call set_network and fix_columns to fix columns " \
-                                              "prior to generating data"
-        self._header = list(X.columns)
+        # assert hasattr(self, 'fix_columns'), "first call set_network and fix_columns to fix columns " \
+        #                                       "prior to generating data"
+        assert self.network_init is not None, "first define network_init prior to fitting data"
         return super().fit(X, y)
 
-    def transform(self, X, n_records=None):
-        n_records = X.shape[0] if n_records is None else n_records
-        assert n_records <= X.shape[0], "Cannot condition more records than present in input X"
+    def transform(self, X):
+        n_records = len(self._fix_columns)
 
         Xt = self._generate_data(X, n_records)
         return Xt
@@ -351,15 +372,18 @@ class PrivBayesFix(PrivBayes):
         df_synth = pd.DataFrame(Xt, columns=[c.node for c in self.network_])[self._header]
         return df_synth
 
-    def fix_columns(self, fix_columns):
-        assert hasattr(self, 'network_'), "use set_network with X_fix columns before defining" \
-                                          "fixing columns"
-        network_init_nodes = [n.node for n in self.network_]
+    def set_fixed_columns(self, fix_columns):
+        # assert hasattr(self, 'network_'), "use set_network with X_fix columns before defining" \
+        #                                   "fixing columns"
+        # assert self.network_init is not None, "use set_network with X_fix columns before " \
+        #                                       "defining fixed columns"
+        network_init_nodes = [n.node for n in self.network_init]
         if not isinstance(fix_columns, pd.DataFrame):
             fix_columns = pd.DataFrame(fix_columns)
 
-        assert set(fix_columns.columns) == set(network_init_nodes), "features in X_fix not set in set_network"
+        assert set(fix_columns.columns) == set(network_init_nodes), "features in X_fix not set in network_init"
         self._fix_columns = fix_columns.reset_index(drop=True)
+        return self
 
     def _sample_record(self, record_init):
         # assume X has columns with values that correspond to the first nodes in the network

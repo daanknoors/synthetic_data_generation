@@ -31,7 +31,7 @@ def compare_value_counts(x1, x2):
         counts_X, counts_y = x1[c].value_counts(dropna=False).align(x2[c].value_counts(dropna=False), join='outer',
                                                                    axis=0, fill_value=0)
         df_compare = pd.concat([counts_X, counts_y], axis=1).astype(int)
-        df_compare.columns = ['real', 'synthetic']
+        df_compare.columns = ['x1', 'x2']
 
         print('='*100)
         print(c)

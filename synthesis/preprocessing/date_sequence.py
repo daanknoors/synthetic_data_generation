@@ -40,9 +40,13 @@ class GeneralizeDateSequence(TransformerMixin, BaseEstimator):
         X = X.copy()
         self.reference_date_col = self.date_sequence[0]
 
-        for col in self.date_sequence:
-            X[col] = pd.to_datetime(X[col], infer_datetime_format=True, errors='coerce')
-
+        # for col in self.date_sequence:
+        #     try:
+        #         X[col] = pd.to_datetime(X[col], infer_datetime_format=True)
+        #     except:
+        #         X[col] = pd.to_datetime(X[col], infer_datetime_format=True, errors='coerce')
+        #
+        X = pd.to_datetime(X.stack(), infer_datetime_format=True).unstack()
         reverse_date_sequence = self.date_sequence[::-1]
 
         for idx, col in enumerate(reverse_date_sequence):

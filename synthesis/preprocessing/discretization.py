@@ -42,7 +42,7 @@ class GeneralizeContinuous(KBinsDiscretizer):
         self
         """
         self._infer_numerical_type(X)
-        self.feature_names = X.columns
+        self._header = X.columns
 
         # X = self._validate_data(X, dtype='numeric')
         X = check_array(X, dtype='numeric', force_all_finite='allow-nan')
@@ -126,7 +126,7 @@ class GeneralizeContinuous(KBinsDiscretizer):
             eps = atol + rtol * np.abs(Xt[~missing_idx, jj])
             Xt[~missing_idx, jj] = np.digitize(Xt[~missing_idx, jj] + eps, bin_edges[jj][1:])
         np.clip(Xt, 0, self.n_bins_ - 1, out=Xt)
-        return Xt
+        return pd.DataFrame(Xt, columns=self._header)
 
     def _infer_numerical_type(self, X):
         """Determine if numerical column is an integer of float for inverse transform"""
@@ -146,7 +146,7 @@ class GeneralizeContinuous(KBinsDiscretizer):
 
     def inverse_transform(self, Xt):
         # check_is_fitted(self)
-        assert set(Xt.columns) == set(self.feature_names), "input contains different columns than seen in fit"
+        assert set(Xt.columns) == set(self._header), "input contains different columns than seen in fit"
 
         Xinv = check_array(Xt, copy=True, dtype=FLOAT_DTYPES, force_all_finite='allow-nan')
         # Xinv = Xt.copy()
@@ -164,17 +164,19 @@ class GeneralizeContinuous(KBinsDiscretizer):
             Xinv[~missing_idx, jj] = np.random.uniform(lower_bounds, upper_bounds)
 
             # todo transfer to numpy
-            if self.feature_names[jj] in self.integer_columns:
+            if self._header[jj] in self.integer_columns:
                 Xinv[~missing_idx, jj] = np.round(Xinv[~missing_idx, jj])
 
-        return Xinv
+        return pd.DataFrame(Xinv, columns=self._header)
+
 
 
 class GeneralizeCategorical(GeneralizeContinuous):
 
-    def __init__(self, epsilon=1.0, n_bins=5, strategy='uniform', labeled_missing=None):
+    def __init__(self, epsilon=1.0, n_bins=5, strategy='uniform', max_cardinality=50):
         super().__init__(n_bins=n_bins, strategy=strategy)
         self.epsilon = epsilon
+        self.max_cardinality = max_cardinality
 
 
     def fit(self, X, y=None):
@@ -203,7 +205,7 @@ class GeneralizeCategorical(GeneralizeContinuous):
         return super().transform(X_enc)
 
     def inverse_transform(self, Xt):
-        assert set(Xt.columns) == set(self.feature_names), "input contains different columns than seen in fit"
+        assert set(Xt.columns) == set(self._header), "input contains different columns than seen in fit"
 
         X_enc = check_array(Xt, copy=True, dtype=FLOAT_DTYPES, force_all_finite='allow-nan')
         # Xinv = Xt.copy()
@@ -253,13 +255,27 @@ class GeneralizeCategorical(GeneralizeContinuous):
 
                 # marginal_probs_normalized = marginal_probs / marginal_probs.sum()
                 # sample encoded (numerical) value based on marginal probabilities
+                # print(jj)
+                # print(X_enc.shape)
+                # print(X_enc[i, jj])
+                # print(marginal_candidate_idx)
                 X_enc[i, jj] = np.random.choice(marginal_candidate_idx, p=marginal_candidate_probs_normalized)
 
                 # X_enc[i, jj] = np.random.choice(list(marginal_candidates.keys()), p=marginal_candidates_normalized.values)
 
         # inverse transform numerical value to original categorical
         X_inv = self._ordinalencoder.inverse_transform(X_enc)
-        return X_inv
+        return pd.DataFrame(X_inv, columns=self._header)
+
+
+
+def get_high_cardinality_features(X, threshold=50):
+    """Get features with more unique values than the specified threshold."""
+    high_cardinality_features = []
+    for c in X.columns:
+        if X[c].nunique() > threshold:
+            high_cardinality_features.append(c)
+    return high_cardinality_features
 
 
 # class GeneralizeCategorical(GeneralizeContinuous):
@@ -298,13 +314,6 @@ class GeneralizeCategorical(GeneralizeContinuous):
 #             pass
 
 
-def get_high_cardinality_features(df, threshold=50):
-    """Get features with more unique values than the specified threshold."""
-    high_cardinality_features = []
-    for c in df.columns:
-        if df[c].nunique() > threshold:
-            high_cardinality_features.append(c)
-    return high_cardinality_features
 
 
 
