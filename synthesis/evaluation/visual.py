@@ -62,7 +62,7 @@ def plot_kmf_comparison(datasets, dataset_names, T_varname, E_varname, G_varname
         dataset_names = [dataset_names]
     assert len(datasets) == len(dataset_names), "input datasets and dataset_names are of different lengths"
 
-    figsize = (10 * len(datasets), 8)
+    figsize = (10 * len(datasets), 7)
     fig, ax = plt.subplots(1, len(datasets), figsize=figsize, sharey=True)
 
     sns.set(font_scale=1.5)

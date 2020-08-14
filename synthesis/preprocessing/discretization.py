@@ -179,7 +179,7 @@ class GeneralizeContinuous(KBinsDiscretizer):
 
 class GeneralizeCategorical(GeneralizeContinuous):
 
-    def __init__(self, epsilon=1.0, n_bins=5, strategy='uniform', max_cardinality=50):
+    def __init__(self, epsilon=1.0, n_bins=5, strategy='uniform', max_cardinality=25):
         super().__init__(n_bins=n_bins, strategy=strategy)
         self.epsilon = epsilon
         self.max_cardinality = max_cardinality

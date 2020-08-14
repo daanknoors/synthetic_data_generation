@@ -76,8 +76,6 @@ class MetaSynthesizer(BaseEstimator, TransformerMixin):
                 assert synthesizer.__class__.__name__ == "PrivBayesFix", "needs PrivBayesFix in order to fix columns"
                 # todo fix need to make dataframe
                 fix_column = pd.DataFrame(Xs_dict[linking_variable].values(), columns=[linking_variable])
-                print(fix_column)
-                print(synthesizer)
                 synthesizer.set_fixed_columns(fix_column)
 
             Xs_featuregroup = synthesizer.transform(Xt[feature_group])
@@ -103,7 +101,6 @@ class MetaSynthesizer(BaseEstimator, TransformerMixin):
         if self.variable_group_order is not None:
             for group in self.variable_group_order:
                 linking_variable = list(self.fitted_columns_.intersection(set(group)))
-                print(linking_variable)
                 assert linking_variable is None or len(linking_variable) < 2, "can only have 1 overlapping (linking) column between groups"
                 linking_variable = list(linking_variable)[0] if bool(linking_variable) else None
 
