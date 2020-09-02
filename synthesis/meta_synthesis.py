@@ -18,6 +18,7 @@ warnings.filterwarnings('ignore')
 
 import synthesis.tools.dp_utils as dp_utils
 import synthesis.tools.utils as utils
+from synthesis._base_synthesis import _BaseSynthesizer
 from synthesis.hist_synthesis import HistSynthesizer
 from synthesis.bayes_synthesis import PrivBayes, PrivBayesFix, NodeParentPair
 from synthesis.preprocessing.discretization import GeneralizeCategorical, GeneralizeContinuous, get_high_cardinality_features
@@ -27,11 +28,11 @@ from thomas.core.factor import Factor
 from thomas.core.bayesiannetwork import BayesianNetwork
 
 
-class MetaSynthesizer(BaseEstimator, TransformerMixin):
+class MetaSynthesizer(_BaseSynthesizer):
 
     def __init__(self,  epsilon: float = 1.0,
                  variable_group_order=None, categorical_vars=None, continuous_vars=None,
-                 date_sequence_vars=None, n_records_synth=None, **kwargs):
+                 date_sequence_vars=None, n_records_synth=None, verbose=0, **kwargs):
         self.epsilon = epsilon
         # self.synthesis_method = synthesis_method #todo allow list of methods
         self.variable_group_order = variable_group_order
@@ -39,6 +40,7 @@ class MetaSynthesizer(BaseEstimator, TransformerMixin):
         self.continuous_vars = continuous_vars
         self.date_sequence_vars = date_sequence_vars
         self.n_records_synth = n_records_synth
+        self.verbose = verbose
 
     def fit(self, X, y=None):
         """Process:
@@ -59,6 +61,7 @@ class MetaSynthesizer(BaseEstimator, TransformerMixin):
         self._fit_synthesis(Xt, local_epsilon)
 
     def transform(self, X):
+        X = pd.DataFrame(X).astype(str, copy=False)
         Xt = self._transform_discretizers(X)
         Xs = self._transform_synthesis(Xt)
         Xs_inv = self._inverse_discretizers(Xs)
@@ -94,6 +97,8 @@ class MetaSynthesizer(BaseEstimator, TransformerMixin):
     def _check_init(self, X):
         self.categorical_vars = list(set(self.categorical_vars)) if self.categorical_vars is not None else None
         self.continuous_vars = list(set(self.continuous_vars)) if self.continuous_vars is not None else None
+        if self.categorical_vars is None and self.continuous_vars is None:
+            self.categorical_vars = list(set(X.columns))
 
         self.fitted_columns_ = set()
         self.linking_variables_ = []
@@ -111,18 +116,18 @@ class MetaSynthesizer(BaseEstimator, TransformerMixin):
             self.linking_variables_.append(None)
         return self
 
-    def _check_input_data(self, X):
-        # converts to dataframe in case of numpy input and make all columns categorical.
-        X = pd.DataFrame(X).astype(str, copy=False)
-        assert X.shape[1] > 1, "input needs at least 2 columns"
-        # prevent integer column indexing issues
-        X.columns = X.columns.astype(str)
-        if hasattr(self, '_header'):
-            assert set(X.columns) == set(self._header), "input contains different columns than seen in fit"
-        else:
-            self._header = list(X.columns)
-
-        return X
+    # def _check_input_data(self, X):
+    #     # converts to dataframe in case of numpy input and make all columns categorical.
+    #     X = pd.DataFrame(X).astype(str, copy=False)
+    #     assert X.shape[1] > 1, "input needs at least 2 columns"
+    #     # prevent integer column indexing issues
+    #     X.columns = X.columns.astype(str)
+    #     if hasattr(self, '_header'):
+    #         assert set(X.columns) == set(self._header), "input contains different columns than seen in fit"
+    #     else:
+    #         self._header = list(X.columns)
+    #
+    #     return X
 
     def _distribute_epsilon(self):
         total_epsilon = self.epsilon
@@ -215,12 +220,12 @@ class MetaSynthesizer(BaseEstimator, TransformerMixin):
             prefit_col = self.linking_variables_[i]
 
             if not prefit_col:
-                synthesizer = PrivBayes(epsilon=local_epsilon, n_records_synth=self.n_records_synth)
+                synthesizer = PrivBayes(epsilon=local_epsilon, n_records_synth=self.n_records_synth, verbose=self.verbose)
                 synthesizer.fit(Xt[group])
             else:
                 print('Fixing column: {}'.format(prefit_col))
                 network_init = [NodeParentPair(node=prefit_col, parents=None)]
-                synthesizer = PrivBayesFix(epsilon=local_epsilon, network_init=network_init)
+                synthesizer = PrivBayesFix(epsilon=local_epsilon, network_init=network_init, verbose=self.verbose)
                 synthesizer.fit(Xt[group])
             self.fitted_synthesizers_.append(synthesizer)
 

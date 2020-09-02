@@ -20,6 +20,7 @@ from copy import deepcopy
 import warnings
 warnings.filterwarnings('ignore')
 
+from synthesis._base_synthesis import _BaseSynthesizer
 import synthesis.tools.dp_utils as dp_utils
 import synthesis.tools.utils as utils
 from thomas.core.cpt import CPT
@@ -34,12 +35,12 @@ score_functions = {
 }
 
 
-class PrivBayes(BaseEstimator, TransformerMixin):
-    """PrivBayes: generate data based on DP Bayesian Network"""
+class PrivBayes(_BaseSynthesizer):
+    """PrivBayes: Private Data Release via Bayesian Networks (Zhang et al 2017)"""
 
     def __init__(self, epsilon: float = 1.0, degree_network=None,
                  theta_usefulness=4, score_function='mi', random_state=None,
-                 epsilon_split=0.4, n_records_synth=None, network_init=None):
+                 epsilon_split=0.4, n_records_synth=None, network_init=None, verbose=0):
         self.epsilon = epsilon
         self.degree_network = degree_network
         self.theta_usefulness = theta_usefulness
@@ -48,10 +49,9 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         self.epsilon_split = epsilon_split
         self.n_records_synth = n_records_synth
         self.network_init = network_init
+        self.verbose = verbose
 
     def fit(self, X, y=None):
-        assert (self.degree_network is None) or (self.degree_network < X.shape[1]), "degree of network > " \
-                                                                                    "number of columns in X"
         self._check_init_args(X)
         X = self._check_input_data(X)
 
@@ -70,22 +70,25 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         n_records = self.n_records_synth if self.n_records_synth is not None else self._n_records_fit
         X = self._check_input_data(X)
         Xt = self._generate_data(X, n_records)
-        print("\n Synthetic Data Generated")
+        if self.verbose:
+            print("\n Synthetic Data Generated")
         return Xt
 
-    def _check_input_data(self, X):
-        # converts to dataframe in case of numpy input and make all columns categorical.
-        X = pd.DataFrame(X).astype(str, copy=False)
-        assert X.shape[1] > 1, "input needs at least 2 columns"
-        # prevent integer column indexing issues
-        X.columns = X.columns.astype(str)
-        if hasattr(self, '_header'):
-            assert set(X.columns) == set(self._header), "input contains different columns than seen in fit"
-        else:
-            self._header = list(X.columns)
-        return X
+    # def _check_input_data(self, X):
+    #     # converts to dataframe in case of numpy input and make all columns categorical.
+    #     X = pd.DataFrame(X).astype(str, copy=False)
+    #     assert X.shape[1] > 1, "input needs at least 2 columns"
+    #     # prevent integer column indexing issues
+    #     X.columns = X.columns.astype(str)
+    #     if hasattr(self, '_header'):
+    #         assert set(X.columns) == set(self._header), "input contains different columns than seen in fit"
+    #     else:
+    #         self._header = list(X.columns)
+    #     return X
 
     def _check_init_args(self, X):
+        assert (self.degree_network is None) or (self.degree_network < X.shape[1]), "degree of network > " \
+                                                                                    "number of columns in X"
         if self.epsilon_split is None:
             self.epsilon_split = [0.4, 0.6]
         else:
@@ -96,7 +99,8 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         n_records, n_columns = X.shape
         if not self.degree_network:
             self.degree_network = self._compute_degree_network(n_records, n_columns)
-        print("1/{} - Degree of network (k): {}\n".format(n_columns, self.degree_network))
+        if self.verbose >= 1:
+            print("1/{} - Degree of network (k): {}\n".format(n_columns, self.degree_network))
         return self
 
     def _greedy_bayes(self, X):
@@ -108,7 +112,8 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         self._n_nodes_dp_computed = len(nodes) - len(nodes_selected)
 
         for i in range(len(nodes_selected), len(nodes)):
-            print("{}/{} - Evaluating next node to add to network".format(i+1, n_columns))
+            if self.verbose >= 2:
+                print("{}/{} - Evaluating next node to add to network".format(i+1, n_columns))
 
             nodes_remaining = nodes - nodes_selected
             n_parents = min(self.degree_network, len(nodes_selected))
@@ -117,7 +122,8 @@ class PrivBayes(BaseEstimator, TransformerMixin):
                 NodeParentPair(n, tuple(p)) for n in nodes_remaining
                 for p in combinations(nodes_selected, n_parents)
             ]
-            print("Number of NodeParentPair candidates: {}".format(len(node_parent_pairs)))
+            if self.verbose >= 2:
+                print("Number of NodeParentPair candidates: {}".format(len(node_parent_pairs)))
 
             scores = self._compute_scores(X, node_parent_pairs)
 
@@ -125,10 +131,12 @@ class PrivBayes(BaseEstimator, TransformerMixin):
                 sampled_pair = self._exponential_mechanism(X, node_parent_pairs, scores)
             else:
                 sampled_pair = node_parent_pairs.index(max(scores))
-            print("Selected node: {} - with parents: {}\n".format(sampled_pair.node, sampled_pair.parents))
+            if self.verbose >= 1:
+                print("Selected node: {} - with parents: {}\n".format(sampled_pair.node, sampled_pair.parents))
             nodes_selected.add(sampled_pair.node)
             self.network_.append(sampled_pair)
-        print("Learned Network Structure\n")
+        if self.verbose >= 1:
+            print("Learned Network Structure\n")
         return self
 
     def _init_network(self, X):
@@ -139,7 +147,8 @@ class PrivBayes(BaseEstimator, TransformerMixin):
             nodes_selected = set(n.node for n in self.network_init)
             # print("Pre-defined network init: {}".format(self.network_))
             for i, pair in enumerate(self.network_init):
-                print("{}/{} - init node {} - with parents: {}".format(i+1, len(self.network_init),
+                if self.verbose >= 1:
+                    print("{}/{} - init node {} - with parents: {}".format(i+1, len(self.network_init),
                                                                    pair.node, pair.parents))
             self.network_ = self.network_init.copy()
             return nodes, nodes_selected
@@ -151,7 +160,8 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         root = np.random.choice(tuple(nodes))
         self.network_.append(NodeParentPair(node=root, parents=None))
         nodes_selected.add(root)
-        print("Root of network: {}\n".format(root))
+        if self.verbose >= 1:
+            print("Root of network: {}\n".format(root))
         return nodes, nodes_selected
 
     def set_network(self, network):
@@ -251,7 +261,8 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         # earlier nodes can be inferred from these distributions without adding extra noise
         for idx, pair in enumerate(self.network_[self.degree_network:]):
             cpt_size = utils.get_size_contingency_table(X[[*pair.parents, pair.node]])
-            print('Learning conditional probabilities: {} - with parents {} ~ estimated size: {}'.format(pair.node,
+            if self.verbose >= 2:
+                print('Learning conditional probabilities: {} - with parents {} ~ estimated size: {}'.format(pair.node,
                                                                                                          pair.parents,
                                                                                                          cpt_size))
             attributes = [*pair.parents, pair.node]
@@ -275,8 +286,8 @@ class PrivBayes(BaseEstimator, TransformerMixin):
             else:
                 attributes = [pair.node]
             cpt_size = utils.get_size_contingency_table(X[attributes])
-
-            print('Learning conditional probabilities: {} - with parents {} ~ estimated size: {}'.format(pair.node,
+            if self.verbose >= 2:
+                print('Learning conditional probabilities: {} - with parents {} ~ estimated size: {}'.format(pair.node,
                                                                                                          pair.parents,
                                                                                                          cpt_size))
             # infer_from_distribution = infer_from_distribution.sum_out(pair.node)
@@ -294,7 +305,8 @@ class PrivBayes(BaseEstimator, TransformerMixin):
         Xt = np.empty([n_records, X.shape[1]], dtype=object)
 
         for i in range(n_records):
-            print('Number of records generated: {} / {}'.format(i+1, n_records), end='\r')
+            if self.verbose >= 1:
+                print('Number of records generated: {} / {}'.format(i+1, n_records), end='\r')
             record = self._sample_record()
             Xt[i] = list(record.values())
 
@@ -312,17 +324,8 @@ class PrivBayes(BaseEstimator, TransformerMixin):
             node_cpt = node.cpt
             for parent in node.conditioning:
                 parent_value = record[parent]
-                # node_cpt = node_cpt[parent_value]
+                node_cpt = node_cpt[parent_value]
 
-                try:
-                    node_cpt = node_cpt[parent_value]
-                except:
-                    print(record)
-                    print(node)
-                    print(node_cpt)
-                    print("parent: {} - {}".format(parent, parent_value))
-                    print('----')
-                    raise ValueError
 
             sampled_node_value = np.random.choice(node.states, p=node_cpt.values)
 
@@ -372,7 +375,8 @@ class PrivBayesFix(PrivBayes):
         Xt = np.empty([n_records, len(self.network_)], dtype=object)
 
         for i in range(n_records):
-            print('Number of records generated: {} / {}'.format(i+1, n_records), end='\r')
+            if self.verbose >= 1:
+                print('Number of records generated: {} / {}'.format(i+1, n_records), end='\r')
             record_init = self._fix_columns.loc[i].to_dict()
             record = self._sample_record(record_init)
             Xt[i] = list(record.values())

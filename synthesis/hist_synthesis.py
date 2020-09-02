@@ -8,12 +8,12 @@ from pyhere import here
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_random_state
 from scipy.spatial.distance import jensenshannon
-
+from synthesis._base_synthesis import _BaseSynthesizer
 from synthesis.tools import dp_utils
 from synthesis.evaluation import visual
 
 
-class HistSynthesizer(BaseEstimator, TransformerMixin):
+class HistSynthesizer(_BaseSynthesizer):
     """Represent data as histogram of all attributes and synthesize based on counts
 
     """
@@ -145,15 +145,15 @@ class ConditionalHistSynthesizer(HistSynthesizer):
         return self.dp_contingency_table_[condition_idx], self.X_bins_[condition_idx]
 
 
-class MarginalSynthesizer(BaseEstimator, TransformerMixin):
+class MarginalSynthesizer(_BaseSynthesizer):
     """Per-column histogram synthesis - sample from DP marginal distributions.
     Will work with any dataset that fits into memory. Does not aim to preserve
     patterns between columns."""
 
-    def __init__(self, epsilon: float = 1.0, random_state=None):
-        # super().__init__()
+    def __init__(self, epsilon: float = 1.0, random_state=None, verbose=0):
         self.epsilon = epsilon
         self.random_state = random_state
+        self.verbose = verbose
 
     def fit(self, X, y=None):
         if hasattr(self, 'schema_'):
@@ -175,7 +175,8 @@ class MarginalSynthesizer(BaseEstimator, TransformerMixin):
             column_value_probabilities = list(self.schema_[c].values())
             column_sampled = np.random.choice(column_values, p=column_value_probabilities, size=n_records, replace=True)
             Xt[c] = column_sampled
-            print('Column sampled: {}'.format(c))
+            if self.verbose >= 1:
+                print('Column sampled: {}'.format(c))
         return pd.DataFrame(Xt)
 
     def get_schema(self, X):
@@ -186,7 +187,8 @@ class MarginalSynthesizer(BaseEstimator, TransformerMixin):
             # note that in Python 3 dicts remember insertion order - thus no need to use ordered dict
             marginal = dp_utils.dp_marginal_distribution(X[c], local_epsilon)
             self.schema_[c] = marginal.to_dict()
-            print('Column fitted: {}'.format(c))
+            if self.verbose >= 1:
+                print('Column fitted: {}'.format(c))
         return self
 
     def set_schema(self, schema, n_records):
