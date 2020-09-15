@@ -150,9 +150,10 @@ class MarginalSynthesizer(_BaseSynthesizer):
     Will work with any dataset that fits into memory. Does not aim to preserve
     patterns between columns."""
 
-    def __init__(self, epsilon: float = 1.0, random_state=None, verbose=0):
+    def __init__(self, epsilon: float = 1.0, random_state=None, n_records_synth=None, verbose=2):
         self.epsilon = epsilon
         self.random_state = random_state
+        self.n_records_synth = n_records_synth
         self.verbose = verbose
 
     def fit(self, X, y=None):
@@ -165,9 +166,9 @@ class MarginalSynthesizer(_BaseSynthesizer):
         self.get_schema(X)
         return self
 
-    def transform(self, X, n_records=None):
-        if not n_records:
-            n_records = self._n_records
+    def transform(self, X):
+        n_records = self.n_records_synth if self.n_records_synth is not None else self._n_records_fit
+
 
         Xt = {}
         for c in X.columns:

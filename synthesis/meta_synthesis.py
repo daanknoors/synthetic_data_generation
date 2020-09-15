@@ -32,7 +32,7 @@ class MetaSynthesizer(_BaseSynthesizer):
 
     def __init__(self,  epsilon: float = 1.0,
                  variable_group_order=None, categorical_vars=None, continuous_vars=None,
-                 date_sequence_vars=None, n_records_synth=None, verbose=0, **kwargs):
+                 date_sequence_vars=None, n_records_synth=None, max_cardinality=10, verbose=2, **kwargs):
         self.epsilon = epsilon
         # self.synthesis_method = synthesis_method #todo allow list of methods
         self.variable_group_order = variable_group_order
@@ -40,6 +40,7 @@ class MetaSynthesizer(_BaseSynthesizer):
         self.continuous_vars = continuous_vars
         self.date_sequence_vars = date_sequence_vars
         self.n_records_synth = n_records_synth
+        self.max_cardinality = max_cardinality
         self.verbose = verbose
 
     def fit(self, X, y=None):
@@ -155,7 +156,8 @@ class MetaSynthesizer(_BaseSynthesizer):
         Xt = X.copy()
 
         if generalize_categorical_columns:
-            gen_cat = GeneralizeCategorical(epsilon=local_epsilon).fit(Xt[generalize_categorical_columns])
+            gen_cat = GeneralizeCategorical(epsilon=local_epsilon, max_cardinality=self.max_cardinality)
+            gen_cat.fit(Xt[generalize_categorical_columns])
             self.discretizers_.append(gen_cat)
             self.discretized_features_.append(generalize_categorical_columns)
 

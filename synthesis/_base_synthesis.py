@@ -3,6 +3,7 @@ import pandas as pd
 import os
 
 from sklearn.base import BaseEstimator, TransformerMixin
+from pathlib import Path
 
 
 
@@ -35,9 +36,9 @@ class _BaseSynthesizer(BaseEstimator, TransformerMixin):
             path = os.getcwd()
             print('Path not specified - will save data in '
                   'current working directory: {}'.format(path))
-
+        path = Path(path)
         filename = X_name + '_' + self.__class__.__name__ + '_' \
-                   + str(self.epsilon) + '.csv'
+                   + str(self.epsilon) + 'eps.csv'
         full_path = path / filename
         X.to_csv(full_path, index=False)
         print("Data written to csv with path: {}".format(full_path))
