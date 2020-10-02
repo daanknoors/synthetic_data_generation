@@ -47,6 +47,7 @@ def joint_distribution(X):
 
 
 def conditional_distribution(X, conditioned_variables):
+    """Conditional distribution with custom normalization procedure to fill missing values with uniform distribution"""
     joint_distribution_ = joint_distribution(X)
     cpt = CPT(joint_distribution_, conditioned_variables=conditioned_variables)
     # todo: use custom normalization to fill missing values with uniform
