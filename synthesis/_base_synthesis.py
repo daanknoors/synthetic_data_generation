@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
+import pickle
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from pathlib import Path
@@ -31,18 +32,39 @@ class _BaseSynthesizer(BaseEstimator, TransformerMixin):
         return X
 
     def write_csv(self, X, X_name, path=None):
-        """"Write csv with a descriptive name of the algorithm and used parameter settings"""
+        """"Write data to csv with a descriptive name of the algorithm and used parameter settings"""
         if path is None:
-            path = os.getcwd()
-            print('Path not specified - will save data in '
-                  'current working directory: {}'.format(path))
+            path = self._default_path()
+
         path = Path(path)
         filename = X_name + '_' + self.__class__.__name__ + '_' \
                    + str(self.epsilon) + 'eps.csv'
         full_path = path / filename
+
         X.to_csv(full_path, index=False)
         print("Data written to csv with path: {}".format(full_path))
         return self
+
+    def write_class(self, X_name, path=None):
+        """Write class to pickle with a descriptive name of the algorithm and parameter settings"""
+        if path is None:
+            path = self._default_path()
+
+        path = Path(path)
+        filename = X_name + '_' + self.__class__.__name__ + '_' \
+                   + str(self.epsilon) + 'eps.p'
+        full_path = path / filename
+
+        pickle.dump(self, open(full_path, "wb"))
+        print("Class written to pickle with path: {}".format(full_path))
+        return self
+
+    def _default_path(self):
+        """Assign default path for writing csv and model if unspecified by user"""
+        path = os.getcwd()
+        print('Path not specified - will save data in '
+              'current working directory: {}'.format(path))
+        return path
 
 
 

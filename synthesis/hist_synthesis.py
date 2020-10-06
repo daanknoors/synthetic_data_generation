@@ -161,8 +161,8 @@ class MarginalSynthesizer(_BaseSynthesizer):
             print('Schema is already fitted')
             return self
         X = X.copy().astype(str)
+        self._n_records_fit, self._n_columns_fit = X.shape
 
-        self._n_records, self._n_columns = X.shape
         self.get_schema(X)
         return self
 
@@ -194,8 +194,8 @@ class MarginalSynthesizer(_BaseSynthesizer):
 
     def set_schema(self, schema, n_records):
         """Give option to user to define schema, else infer from data"""
-        self._n_records = n_records
-        self._n_columns = len(schema)
+        self._n_records_fit = n_records
+        self._n_columns_fit = len(schema)
         self.schema_ = schema
         return self
 
