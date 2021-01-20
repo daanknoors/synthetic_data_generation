@@ -203,7 +203,7 @@ class MarginalSynthesizer(_BaseSynthesizer):
 if __name__ == '__main__':
     # data_path = r"c:/data/1_iknl/processed/crc_stage_subsettumor.csv"
     # data_path = r"c:/data/1_iknl/raw/jrc/CancerCases_NL_nov2016.csv"
-    data_path = here("examples/data/input/adult.csv")
+    data_path = here("examples/data/input/adult_9c.csv")
     df = pd.read_csv(data_path, delimiter=', ').astype(str)
     columns = ['age', 'sex', 'education', 'workclass', 'income']
     df = df.loc[:, columns]

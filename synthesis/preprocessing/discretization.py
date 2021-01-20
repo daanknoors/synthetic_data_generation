@@ -342,7 +342,7 @@ if __name__ == '__main__':
     # print(X_inv)
     # print(gen_cont.bin_edges_)
 
-    data_path = here("examples/data/input/adult.csv")
+    data_path = here("examples/data/input/adult_9c.csv")
     df = pd.read_csv(data_path, delimiter=', ').astype(str)
     print(df.head())
     df_s = df[['native-country', 'occupation']]

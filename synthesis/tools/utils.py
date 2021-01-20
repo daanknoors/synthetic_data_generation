@@ -1,20 +1,17 @@
 """
-General functions for differentially private computations
+General functions and building blocks
 """
 import warnings
 from sys import maxsize
 from numbers import Real
 import numpy as np
 import pandas as pd
+import os
 from numpy.core import multiarray as mu
 from numpy.core import umath as um
 from itertools import product
+from pathlib import Path
 from thomas.core import CPT
-
-from diffprivlib.tools.histograms import histogram as diffprivlib_hist
-
-from diffprivlib.mechanisms import Laplace, LaplaceBoundedDomain
-from diffprivlib.utils import PrivacyLeakWarning
 
 
 # def contingency_table(X):
@@ -73,6 +70,14 @@ def get_size_contingency_table(X):
         size *= X[jj].nunique()
     return size
 
+def rank_columns_on_cardinality(X):
+    """Rank columns based on number of unique values"""
+    column_cardinalities = {}
+    for col in X.columns:
+        column_cardinalities[col] = X[col].nunique()
+
+    ranked_column_cardinalities = pd.Series(column_cardinalities).sort_values(ascending=False)
+    return ranked_column_cardinalities
 
 # def contingency_table(X):
 #     """Represent data as contingency table of all attributes"""

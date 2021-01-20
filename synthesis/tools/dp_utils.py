@@ -63,9 +63,7 @@ def dp_marginal_distribution(X, epsilon=1.0, range=None):
         # round counts upwards to preserve bins with noisy count between [0, 1]
         dp_marginal[i] = dp_mech.randomise(marginal.values[i])
 
-    # noise can result into negative counts, thus set boundary at 0
-    dp_marginal = np.clip(dp_marginal, a_min=0, a_max=None)
-    dp_marginal = dp_marginal / dp_marginal.sum()
+    dp_marginal = dp_normalize(dp_marginal)
 
     return pd.Series(dp_marginal, index=marginal.index)
 
@@ -91,16 +89,22 @@ def dp_joint_distribution(X, epsilon=1.0, range=None):
     for i in np.arange(dp_joint_distribution_.shape[0]):
         dp_joint_distribution_[i] = dp_mech.randomise(joint_distribution_.values[i])
 
-
-    # laplacian_noise = np.random.laplace(0, scale=sensitivity / epsilon, size=joint_distribution_.shape[0])
-    # dp_joint_distribution = joint_distribution_ + laplacian_noise
-
-    # noise can result into negative probabilities, thus set boundary at 0 and re-normalize
-    dp_joint_distribution_[dp_joint_distribution_ < 0] = 0
-    # dp_joint_distribution_ = np.clip(dp_joint_distribution_, a_min=0, a_max=None)
-    dp_joint_distribution_ = dp_joint_distribution_ / dp_joint_distribution_.sum()
+    dp_joint_distribution_ = dp_normalize(dp_joint_distribution_)
     return pd.Series(dp_joint_distribution_, index=joint_distribution_.index)
 
+def dp_normalize(distribution):
+    """Normalizes probability distributions after DP noise addition"""
+    # noise can result into negative counts, thus clip lower bound at 0
+    distribution = np.clip(distribution, a_min=0, a_max=None)
+
+    # if all elements are zero (due to negative dp noise), set all elements to uniform distribution
+    all_zeros = not np.any(distribution)
+    if all_zeros:
+        uniform_distribution = np.repeat(1/len(distribution), repeats=len(distribution))
+        distribution = uniform_distribution
+
+    normalized_distribution = distribution / distribution.sum()
+    return normalized_distribution
 
 def dp_conditional_distribution(X, epsilon=1.0, conditioned_variables=None, range=None):
     dp_joint_distribution_ = dp_joint_distribution(X, epsilon=epsilon)

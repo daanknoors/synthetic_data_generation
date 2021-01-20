@@ -24,7 +24,7 @@ from synthesis.bayes_synthesis import PrivBayes
 import pandas as pd
 
 # load data
-df = pd.read_csv('examples/data/input/adult.csv')
+df = pd.read_csv('examples/data/input/adult_9c.csv')
 
 # set desired privacy level (differential privacy) - default = 1
 epsilon = 0.1

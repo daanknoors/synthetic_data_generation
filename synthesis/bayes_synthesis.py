@@ -264,12 +264,7 @@ class PrivBayes(_BaseSynthesizer):
 
     def _max_degree_network(self, X):
         """calculate max degree network to ensure the CPTs will fit into memory"""
-        column_cardinalities = {}
-        for col in X.columns:
-            column_cardinalities[col] = X[col].nunique()
-
-        ranked_column_cardinalities = pd.Series(column_cardinalities).sort_values(ascending=False)
-
+        ranked_column_cardinalities = utils.rank_columns_on_cardinality(X)
         threshold_table_size = 10000000
         cum_cardinality = 1
         degree_network = 0
@@ -461,7 +456,7 @@ class PrivBayesFix(PrivBayes):
 
 
 if __name__ == "__main__":
-    data_path = here("examples/data/input/adult.csv")
+    data_path = here("examples/data/input/adult_9c.csv")
     df = pd.read_csv(data_path, delimiter=', ').astype(str)
     columns = ['age', 'sex', 'education', 'workclass', 'income']
     df = df.loc[:, columns]
