@@ -90,7 +90,7 @@ class GeneralizeDateSequence(TransformerMixin, BaseEstimator):
         for c in self.date_sequence[1:]:
             # add days to reference date
             Xinv[c] = reference_date_ymd + pd.to_timedelta(Xinv[c].astype(float), unit='d')
-
+            reference_date_ymd = Xinv[c]
 
         return Xinv
 

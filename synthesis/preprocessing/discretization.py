@@ -14,8 +14,9 @@ from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_array, check_is_fitted, FLOAT_DTYPES
 from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
 
-from synthesis.tools.dp_utils import dp_marginal_distribution
+from synthesis.tools.dp_utils import dp_marginal_distribution, dp_normalize
 from synthesis.evaluation import visual
+
 
 
 class GeneralizeContinuous(KBinsDiscretizer):
@@ -254,7 +255,8 @@ class GeneralizeCategorical(GeneralizeContinuous):
                 #np.where returns 1d tuple, thus index 0
                 marginal_candidate_idx = np.where(X_enc[i, jj] == marginal_group_alloc)[0]
                 marginal_candidate_probs = marginals[marginal_candidate_idx]
-                marginal_candidate_probs_normalized = marginal_candidate_probs / marginal_candidate_probs.sum()
+                marginal_candidate_probs_normalized = dp_normalize(marginal_candidate_probs)
+
 
                 # marginal_idx = np.arange(lower_bounds[i], upper_bounds[i])
                 # marginal_probs = marginals[marginal_idx]
