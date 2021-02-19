@@ -40,7 +40,8 @@ class PrivBayes(_BaseSynthesizer):
 
     def __init__(self, epsilon: float = 1.0, degree_network=None,
                  theta_usefulness=4, score_function='mi', random_state=None,
-                 epsilon_split=0.4, n_records_synth=None, network_init=None, verbose=2):
+                 epsilon_split=0.4, n_records_synth=None, network_init=None,
+                 max_cpt_size=10000000, verbose=2):
         self.epsilon = epsilon
         self.degree_network = degree_network
         self.theta_usefulness = theta_usefulness
@@ -49,6 +50,7 @@ class PrivBayes(_BaseSynthesizer):
         self.epsilon_split = epsilon_split
         self.n_records_synth = n_records_synth
         self.network_init = network_init
+        self.max_cpt_size=max_cpt_size
         self.verbose = verbose
 
     def fit(self, X, y=None):
@@ -101,12 +103,13 @@ class PrivBayes(_BaseSynthesizer):
             self.degree_network = self._compute_degree_network(n_records, n_columns)
 
         # check if degree network will not result in conditional tables that do not fit into memory
-        max_degree_network = self._max_degree_network(X)
-        if self.degree_network > max_degree_network:
-            if self.verbose >= 1:
-                print("Degree network capped from {} to {} to be able to fit CPT into memory"
-                      .format(self.degree_network, max_degree_network))
-                self.degree_network = max_degree_network
+        if self.max_cpt_size:
+            max_degree_network = self._max_degree_network(X)
+            if self.degree_network > max_degree_network:
+                if self.verbose >= 1:
+                    print("Degree network capped from {} to {} to be able to fit CPT into memory"
+                          .format(self.degree_network, max_degree_network))
+                    self.degree_network = max_degree_network
 
         if self.verbose >= 1:
             print("Degree of network (k): {}\n".format(self.degree_network))
@@ -265,12 +268,11 @@ class PrivBayes(_BaseSynthesizer):
     def _max_degree_network(self, X):
         """calculate max degree network to ensure the CPTs will fit into memory"""
         ranked_column_cardinalities = utils.rank_columns_on_cardinality(X)
-        threshold_table_size = 10000000
         cum_cardinality = 1
         degree_network = 0
         for k, cardinality in enumerate(ranked_column_cardinalities):
             cum_cardinality *= cardinality
-            if cum_cardinality >= threshold_table_size:
+            if cum_cardinality >= self.max_cpt_size:
                 break
             degree_network += 1
         return degree_network

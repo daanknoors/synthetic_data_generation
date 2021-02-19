@@ -83,4 +83,5 @@ def plot_kmf_comparison(datasets, dataset_names, T_varname, E_varname, G_varname
             ax_cur = kmf.plot(ax=ax_cur, color=color)
             ax_cur.legend(title=G_varname)
             ax_cur.set_title('Survival Analysis C50 - {} Data'.format(X_name))
+            ax_cur.set_ylim(0, 1)
     plt.tight_layout()
