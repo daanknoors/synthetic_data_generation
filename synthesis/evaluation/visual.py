@@ -72,8 +72,8 @@ def plot_kmf_comparison(datasets, dataset_names, T_varname, E_varname, G_varname
     palette = ['#0d3d56', '#006887', '#0098b5', '#00cbde', '#00ffff']
 
     for X, X_name, ax_cur in zip(datasets, dataset_names, ax):
-        T = X[T_varname]
-        E = X[E_varname]
+        T = X[T_varname].astype(float)
+        E = X[E_varname].astype(float)
 
         kmf = KaplanMeierFitter()
         unique_values = np.sort(X[G_varname].unique())
