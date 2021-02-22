@@ -279,6 +279,8 @@ class PrivBayes(_BaseSynthesizer):
 
     def _compute_conditional_distributions(self, X):
         P = dict()
+        # note we only compute n_columns - (degree_network+1), as the CPTs from the other nodes
+        # in range [0, degree_network] can be inferred -> ensures (eps_2 / (d-k))-differential privacy
         local_epsilon = self.epsilon * self.epsilon_split[1] / (self._n_columns_fit - self.degree_network)
 
         # first materialize noisy distributions for nodes who have a equal number of parents to the degree k.
