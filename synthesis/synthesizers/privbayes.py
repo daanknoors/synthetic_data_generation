@@ -81,7 +81,7 @@ class PrivBayes(BaseDPSynthesizer):
         super()._check_init_args()
 
         if self.epsilon_split is None:
-            self.epsilon_split = [0.4, 0.6]
+            self.epsilon_split = [0.3, 0.7]
         else:
             if isinstance(self.epsilon_split, float):
                 self.epsilon_split = [self.epsilon_split, 1-self.epsilon_split]
@@ -348,6 +348,31 @@ class PrivBayes(BaseDPSynthesizer):
             record[node.name] = sampled_node_value
 
         return record
+
+
+class PrivBayesBinary(PrivBayes):
+    """PrivBayes on binary encoded data - use F score function and a fixed degree k"""
+
+    def _compute_degree_network(self, n_records, n_columns):
+        """
+        Determine the degree of the network (k) by finding the lowest integer k possible that ensures that the defined
+        level of theta-usefulness is met. This criterion measures the ratio of information over noise.
+        Lemma 4.8 in the paper.
+
+        Note there are some inconsistencies between the original paper from 2014 and the updated version in 2017
+        - avg_scale_info: full epsilon in paper 2014 | epsilon_2 in paper2017
+        - avg_scale_noise: k + 3 in paper 2014 lemma 3 | k + 2 in paper 2017 lemma  4.8
+        """
+        k = n_columns - 1
+
+        while k > 1:
+            # avg_scale_info = self.epsilon * (1 - self.epsilon_split[0]) * n_records
+            avg_scale_info = self.epsilon * self.epsilon_split[1] * n_records
+            avg_scale_noise = (n_columns - k) * (2 ** (k + 2))
+            if (avg_scale_info / avg_scale_noise) >= self.theta_usefulness:
+                break
+            k -= 1
+        return k
 
 
 # class PrivBayesFix(PrivBayes):
