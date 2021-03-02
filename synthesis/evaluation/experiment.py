@@ -1,23 +1,13 @@
 """Functions to help perform an experimental run of synthesis"""
-import warnings
-from sys import maxsize
-from numbers import Real
-import numpy as np
-import pandas as pd
-import os
-from numpy.core import multiarray as mu
-from numpy.core import umath as um
 from itertools import product
 from pathlib import Path
-from thomas.core import CPT
 
-from synthesis.bayes_synthesis import PrivBayes
-from synthesis.hist_synthesis import MarginalSynthesizer
-from synthesis.meta_synthesis import MetaSynthesizer
+from synthesis.synthesizers.privbayes import PrivBayes
+from synthesis.synthesizers.marginal import MarginalSynthesizer
 
 def synthesis_experiment(X, X_name, synthesizers=None, epsilon=None, n_records_synth=None, path=None, verbose=2):
     if synthesizers is None:
-        synthesizers = [MarginalSynthesizer, PrivBayes, MetaSynthesizer]
+        synthesizers = [MarginalSynthesizer, PrivBayes]
 
     if not isinstance(path, Path):
         path = Path(path)

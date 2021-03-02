@@ -6,15 +6,11 @@ import pandas as pd
 import warnings
 
 from pyhere import here
-from pathlib import Path
 
-
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.utils import check_random_state
-from sklearn.utils.validation import check_array, check_is_fitted, FLOAT_DTYPES
+from sklearn.utils.validation import check_array, FLOAT_DTYPES
 from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
 
-from synthesis.tools.dp_utils import dp_marginal_distribution, dp_normalize
+from synthesis.synthesizers.utils import dp_marginal_distribution, _normalize_distribution
 from synthesis.evaluation import visual
 
 
@@ -255,7 +251,7 @@ class GeneralizeCategorical(GeneralizeContinuous):
                 #np.where returns 1d tuple, thus index 0
                 marginal_candidate_idx = np.where(X_enc[i, jj] == marginal_group_alloc)[0]
                 marginal_candidate_probs = marginals[marginal_candidate_idx]
-                marginal_candidate_probs_normalized = dp_normalize(marginal_candidate_probs)
+                marginal_candidate_probs_normalized = _normalize_distribution(marginal_candidate_probs)
 
 
                 # marginal_idx = np.arange(lower_bounds[i], upper_bounds[i])

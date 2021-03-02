@@ -3,7 +3,7 @@ import pandas as pd
 import unittest
 from diffprivlib.utils import PrivacyLeakWarning
 
-from synthesis.hist_synthesis import HistSynthesizer
+from synthesis.synthesizers.marginal import HistSynthesizer
 
 
 class TestHistSynthesizer(unittest.TestCase):

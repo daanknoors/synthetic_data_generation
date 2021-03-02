@@ -1,5 +1,5 @@
 """
-Synthetic Data Generation using a Bayesian Network
+Synthetic data generation via Bayesian Networks
 
 Based on following paper
 
@@ -10,7 +10,6 @@ PrivBayes: Private Data Release via Bayesian Networks. (2017)
 import numpy as np
 import pandas as pd
 from pyhere import here
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_random_state
 from sklearn.metrics import mutual_info_score
 from itertools import combinations
@@ -20,9 +19,8 @@ from copy import deepcopy
 import warnings
 warnings.filterwarnings('ignore')
 
-from synthesis._base_synthesis import _BaseSynthesizer
-import synthesis.tools.dp_utils as dp_utils
-import synthesis.tools.utils as utils
+from synthesis.synthesizers._base import BaseDPSynthesizer
+import synthesis.synthesizers.utils as utils
 from thomas.core.cpt import CPT
 from thomas.core.factor import Factor
 from thomas.core.bayesiannetwork import BayesianNetwork
@@ -35,7 +33,7 @@ score_functions = {
 }
 
 
-class PrivBayes(_BaseSynthesizer):
+class PrivBayes(BaseDPSynthesizer):
     """PrivBayes: Private Data Release via Bayesian Networks (Zhang et al 2017)"""
 
     def __init__(self, epsilon: float = 1.0, degree_network=None,
@@ -53,9 +51,11 @@ class PrivBayes(_BaseSynthesizer):
         self.max_cpt_size=max_cpt_size
         self.verbose = verbose
 
-    def fit(self, X, y=None):
-        self._check_init_args(X)
-        X = self._check_input_data(X)
+    def fit(self, data):
+        self._check_init_args()
+        X = self._check_input_data(data)
+
+        self._check_degree_network(data)
 
         self._n_records_fit, self._n_columns_fit = X.shape
         # X = X.loc[columns] if columns is not None else X
@@ -64,33 +64,22 @@ class PrivBayes(_BaseSynthesizer):
         self._greedy_bayes(X)
         self._compute_conditional_distributions(X)
         # todo specify name in init?
-        self.bayesian_network_ = BayesianNetwork.from_CPTs('PrivBayes', self.cpt_.values())
+        self.model_ = BayesianNetwork.from_CPTs('PrivBayes', self.cpt_.values())
         return self
 
-    def transform(self, X):
+    def sample(self, n_records=None):
         # n_records = self._n_records_fit if n_records is None else n_records
-        n_records = self.n_records_synth if self.n_records_synth is not None else self._n_records_fit
-        X = self._check_input_data(X)
-        Xt = self._generate_data(X, n_records)
+        self._check_is_fitted()
+        n_records = n_records or self.n_records_fit_
+
+        Xt = self._generate_data(n_records)
         if self.verbose:
             print("\nSynthetic Data Generated\n")
         return Xt
 
-    # def _check_input_data(self, X):
-    #     # converts to dataframe in case of numpy input and make all columns categorical.
-    #     X = pd.DataFrame(X).astype(str, copy=False)
-    #     assert X.shape[1] > 1, "input needs at least 2 columns"
-    #     # prevent integer column indexing issues
-    #     X.columns = X.columns.astype(str)
-    #     if hasattr(self, '_header'):
-    #         assert set(X.columns) == set(self._header), "input contains different columns than seen in fit"
-    #     else:
-    #         self._header = list(X.columns)
-    #     return X
+    def _check_init_args(self):
+        super()._check_init_args()
 
-    def _check_init_args(self, X):
-        assert (self.degree_network is None) or (self.degree_network < X.shape[1]), "degree of network > " \
-                                                                                    "number of columns in X"
         if self.epsilon_split is None:
             self.epsilon_split = [0.4, 0.6]
         else:
@@ -98,9 +87,11 @@ class PrivBayes(_BaseSynthesizer):
                 self.epsilon_split = [self.epsilon_split, 1-self.epsilon_split]
             self.epsilon_split = list(self.epsilon_split)
 
-        n_records, n_columns = X.shape
+
+
+    def _check_degree_network(self, X):
         if not self.degree_network:
-            self.degree_network = self._compute_degree_network(n_records, n_columns)
+            self.degree_network = self._compute_degree_network(self.n_records_fit_, len(self.columns_))
 
         # check if degree network will not result in conditional tables that do not fit into memory
         if self.max_cpt_size:
@@ -113,7 +104,6 @@ class PrivBayes(_BaseSynthesizer):
 
         if self.verbose >= 1:
             print("Degree of network (k): {}\n".format(self.degree_network))
-        return self
 
     def _greedy_bayes(self, X):
         n_records, n_columns = X.shape
@@ -283,7 +273,7 @@ class PrivBayes(_BaseSynthesizer):
         # in range [0, degree_network] can be inferred -> ensures (eps_2 / (d-k))-differential privacy
         local_epsilon = self.epsilon * self.epsilon_split[1] / (self._n_columns_fit - self.degree_network)
 
-        # first materialize noisy distributions for nodes who have a equal number of parents to the degree k.
+        # first materialize noisy joint distributions for nodes who have a equal number of parents to the degree k.
         # earlier nodes can be inferred from these distributions without adding extra noise
         for idx, pair in enumerate(self.network_[self.degree_network:]):
             cpt_size = utils.get_size_contingency_table(X[[*pair.parents, pair.node]])
@@ -292,13 +282,13 @@ class PrivBayes(_BaseSynthesizer):
                                                                                                          pair.parents,
                                                                                                          cpt_size))
             attributes = [*pair.parents, pair.node]
-            dp_joint_distribution = dp_utils.dp_joint_distribution(X[attributes], epsilon=local_epsilon)
+            dp_joint_distribution = utils.dp_joint_distribution(X[attributes], epsilon=local_epsilon)
             # dp_joint_distribution = utils.joint_distribution(X[attributes])
             cpt = CPT(dp_joint_distribution, conditioned_variables=[pair.node])
             # todo: use custom normalization to fill missing values with uniform
-            cpt = utils.normalize_cpt(cpt, dropna=False)
+            cpt = utils._normalize_cpt(cpt, dropna=False)
             P[pair.node] = cpt
-            # retain noisy joint distribution from k+1 node to infer distributions parent nodes
+            # retain noisy joint distribution from k+1 node to infer distribution parent nodes
             if idx == 0:
                 infer_from_distribution = Factor(dp_joint_distribution)
                 infer_from_distribution = infer_from_distribution.sum_out(pair.node)
@@ -319,7 +309,7 @@ class PrivBayes(_BaseSynthesizer):
             # infer_from_distribution = infer_from_distribution.sum_out(pair.node)
             # conditioned_var = pair.parents[-1]
             cpt = CPT(infer_from_distribution, conditioned_variables=[pair.node])
-            cpt = utils.normalize_cpt(cpt, dropna=False)
+            cpt = utils._normalize_cpt(cpt, dropna=False)
 
             P[pair.node] = cpt
             infer_from_distribution = infer_from_distribution.sum_out(pair.node)
@@ -327,8 +317,8 @@ class PrivBayes(_BaseSynthesizer):
         self.cpt_ = P
         return self
 
-    def _generate_data(self, X, n_records):
-        Xt = np.empty([n_records, X.shape[1]], dtype=object)
+    def _generate_data(self, n_records):
+        Xt = np.empty([n_records, len(self.columns_)], dtype=object)
 
         for i in range(n_records):
             if self.verbose >= 1:
@@ -337,13 +327,13 @@ class PrivBayes(_BaseSynthesizer):
             Xt[i] = list(record.values())
 
         # np to df with original column ordering
-        Xs = pd.DataFrame(Xt, columns=[c.node for c in self.network_])[self._header]
+        Xs = pd.DataFrame(Xt, columns=[c.node for c in self.network_])[self.columns_]
         return Xs
 
     def _sample_record(self):
         record = {}
         for col_idx, pair in enumerate(self.network_):
-            node = self.bayesian_network_[pair.node]
+            node = self.model_[pair.node]
             # todo filter cpt based on sampled parents
 
             # specify pre-sampled conditioning values
@@ -360,108 +350,108 @@ class PrivBayes(_BaseSynthesizer):
         return record
 
 
-class PrivBayesFix(PrivBayes):
-
-    def __init__(self, epsilon: float = 1.0, degree_network=None,
-                 theta_usefulness=4, score_function='mi', random_state=None,
-                 epsilon_split=0.4, n_records_synth=None, network_init=None,
-                 fix_columns=None):
-        super().__init__(epsilon=epsilon, degree_network=degree_network,
-                         theta_usefulness=theta_usefulness, score_function=score_function,
-                         random_state=random_state,
-                         epsilon_split=epsilon_split, n_records_synth=n_records_synth,
-                         network_init=network_init)
-        self._fix_columns = fix_columns
-
-    # def _init_network(self, X):
-    #     # todo implement user-specified init network
-    #
-    #     nodes = set(X.columns)
-    #     network = []
-    #     nodes_selected = set()
-    #
-    #     root = np.random.choice(tuple(nodes))
-    #     network.append(NodeParentPair(node=root, parents=None))
-    #     nodes_selected.add(root)
-    #     print("Root of network: {}".format(root))
-
-    def fit(self, X, y=None):
-        # assert hasattr(self, 'fix_columns'), "first call set_network and fix_columns to fix columns " \
-        #                                       "prior to generating data"
-        assert self.network_init is not None, "first define network_init prior to fitting data"
-        return super().fit(X, y)
-
-    def transform(self, X):
-        n_records = len(self._fix_columns)
-
-        Xt = self._generate_data(X, n_records)
-        return Xt
-
-    def _generate_data(self, X, n_records):
-        Xt = np.empty([n_records, len(self.network_)], dtype=object)
-
-        for i in range(n_records):
-            if self.verbose >= 1:
-                print('Number of records generated: {} / {}'.format(i+1, n_records), end='\r')
-            record_init = self._fix_columns.loc[i].to_dict()
-            record = self._sample_record(record_init)
-            Xt[i] = list(record.values())
-
-        # np to df with original column ordering
-        df_synth = pd.DataFrame(Xt, columns=[c.node for c in self.network_])[self._header]
-        return df_synth
-
-    def set_fixed_columns(self, fix_columns):
-        # assert hasattr(self, 'network_'), "use set_network with X_fix columns before defining" \
-        #                                   "fixing columns"
-        # assert self.network_init is not None, "use set_network with X_fix columns before " \
-        #                                       "defining fixed columns"
-        network_init_nodes = [n.node for n in self.network_init]
-        if not isinstance(fix_columns, pd.DataFrame):
-            fix_columns = pd.DataFrame(fix_columns)
-
-        assert set(fix_columns.columns) == set(network_init_nodes), "features in X_fix not set in network_init"
-        self._fix_columns = fix_columns.reset_index(drop=True)
-        return self
-
-    def _sample_record(self, record_init):
-        # assume X has columns with values that correspond to the first nodes in the network
-        # that we would like to fix and condition for.
-        record = record_init
-
-        # sample remaining nodes after fixing for input X
-        for col_idx, pair in enumerate(self.network_[len(record_init):]):
-            node = self.bayesian_network_[pair.node]
-            # todo filter cpt based on sampled parents
-
-            # specify pre-sampled conditioning values
-            node_cpt = node.cpt
-            for parent in node.conditioning:
-                parent_value = record[parent]
-                node_cpt = node_cpt[parent_value]
-                # try:
-                #     node_cpt = node_cpt[parent_value]
-                # except:
-                #     print(record)
-                #     print(node)
-                #     print(node_cpt)
-                #     print("parent: {} - {}".format(parent, parent_value))
-                #     print('----')
-                #     raise ValueError
-            # print(node.states)
-            # print(node_cpt.values)
-            sampled_node_value = np.random.choice(node.states, p=node_cpt.values)
-
-            record[node.name] = sampled_node_value
-
-        return record
+# class PrivBayesFix(PrivBayes):
+#
+#     def __init__(self, epsilon: float = 1.0, degree_network=None,
+#                  theta_usefulness=4, score_function='mi', random_state=None,
+#                  epsilon_split=0.4, n_records_synth=None, network_init=None,
+#                  fix_columns=None):
+#         super().__init__(epsilon=epsilon, degree_network=degree_network,
+#                          theta_usefulness=theta_usefulness, score_function=score_function,
+#                          random_state=random_state,
+#                          epsilon_split=epsilon_split, n_records_synth=n_records_synth,
+#                          network_init=network_init)
+#         self._fix_columns = fix_columns
+#
+#     # def _init_network(self, X):
+#     #     # todo implement user-specified init network
+#     #
+#     #     nodes = set(X.columns)
+#     #     network = []
+#     #     nodes_selected = set()
+#     #
+#     #     root = np.random.choice(tuple(nodes))
+#     #     network.append(NodeParentPair(node=root, parents=None))
+#     #     nodes_selected.add(root)
+#     #     print("Root of network: {}".format(root))
+#
+#     def fit(self, X, y=None):
+#         # assert hasattr(self, 'fix_columns'), "first call set_network and fix_columns to fix columns " \
+#         #                                       "prior to generating data"
+#         assert self.network_init is not None, "first define network_init prior to fitting data"
+#         return super().fit(X, y)
+#
+#     def transform(self, X):
+#         n_records = len(self._fix_columns)
+#
+#         Xt = self._generate_data(X, n_records)
+#         return Xt
+#
+#     def _generate_data(self, X, n_records):
+#         Xt = np.empty([n_records, len(self.network_)], dtype=object)
+#
+#         for i in range(n_records):
+#             if self.verbose >= 1:
+#                 print('Number of records generated: {} / {}'.format(i+1, n_records), end='\r')
+#             record_init = self._fix_columns.loc[i].to_dict()
+#             record = self._sample_record(record_init)
+#             Xt[i] = list(record.values())
+#
+#         # np to df with original column ordering
+#         df_synth = pd.DataFrame(Xt, columns=[c.node for c in self.network_])[self.columns_]
+#         return df_synth
+#
+#     def set_fixed_columns(self, fix_columns):
+#         # assert hasattr(self, 'network_'), "use set_network with X_fix columns before defining" \
+#         #                                   "fixing columns"
+#         # assert self.network_init is not None, "use set_network with X_fix columns before " \
+#         #                                       "defining fixed columns"
+#         network_init_nodes = [n.node for n in self.network_init]
+#         if not isinstance(fix_columns, pd.DataFrame):
+#             fix_columns = pd.DataFrame(fix_columns)
+#
+#         assert set(fix_columns.columns) == set(network_init_nodes), "features in X_fix not set in network_init"
+#         self._fix_columns = fix_columns.reset_index(drop=True)
+#         return self
+#
+#     def _sample_record(self, record_init):
+#         # assume X has columns with values that correspond to the first nodes in the network
+#         # that we would like to fix and condition for.
+#         record = record_init
+#
+#         # sample remaining nodes after fixing for input X
+#         for col_idx, pair in enumerate(self.network_[len(record_init):]):
+#             node = self.bayesian_network_[pair.node]
+#             # todo filter cpt based on sampled parents
+#
+#             # specify pre-sampled conditioning values
+#             node_cpt = node.cpt
+#             for parent in node.conditioning:
+#                 parent_value = record[parent]
+#                 node_cpt = node_cpt[parent_value]
+#                 # try:
+#                 #     node_cpt = node_cpt[parent_value]
+#                 # except:
+#                 #     print(record)
+#                 #     print(node)
+#                 #     print(node_cpt)
+#                 #     print("parent: {} - {}".format(parent, parent_value))
+#                 #     print('----')
+#                 #     raise ValueError
+#             # print(node.states)
+#             # print(node_cpt.values)
+#             sampled_node_value = np.random.choice(node.states, p=node_cpt.values)
+#
+#             record[node.name] = sampled_node_value
+#
+#         return record
 
 
 
 
 if __name__ == "__main__":
-    data_path = here("examples/data/input/adult_9c.csv")
-    df = pd.read_csv(data_path, delimiter=', ').astype(str)
+    data_path = 'C:/projects/synthetic_data_generation/examples/data/original/adult.csv'
+    df = pd.read_csv(data_path, delimiter=', ')
     columns = ['age', 'sex', 'education', 'workclass', 'income']
     df = df.loc[:, columns]
     print(df.head())
@@ -473,23 +463,22 @@ if __name__ == "__main__":
     print(pb.network_)
     print("Succesfull")
 
-    pb_copy = deepcopy(pb)
 
-    df_synth = pb.transform(df)
+    df_synth = pb.sample()
     df_synth.head()
     
-    # fixing a network - specify init network to fix those variables when generating
-    pbfix = PrivBayesFix(epsilon, degree_network=2)
-    # init_network = [NodeParentPair('age', None), NodeParentPair('education', 'age')]
-    init_network = [NodeParentPair(node='age', parents=None),
-                     NodeParentPair(node='education', parents='age'),
-                     NodeParentPair(node='sex', parents=('age', 'education')),
-                     NodeParentPair(node='workclass', parents=('age', 'education')),
-                     NodeParentPair(node='income', parents=('sex', 'age'))]
-    pbfix.set_network(init_network)
-    pbfix.fit(df)
-    pbfix_copy = deepcopy(pbfix)
-
-
-    # x2 = df.copy() # todo should really be synth
-    df_synth_tuned = pbfix.transform(df_synth[['age', 'education']])
+    # # fixing a network - specify init network to fix those variables when generating
+    # pbfix = PrivBayesFix(epsilon, degree_network=2)
+    # # init_network = [NodeParentPair('age', None), NodeParentPair('education', 'age')]
+    # init_network = [NodeParentPair(node='age', parents=None),
+    #                  NodeParentPair(node='education', parents='age'),
+    #                  NodeParentPair(node='sex', parents=('age', 'education')),
+    #                  NodeParentPair(node='workclass', parents=('age', 'education')),
+    #                  NodeParentPair(node='income', parents=('sex', 'age'))]
+    # pbfix.set_network(init_network)
+    # pbfix.fit(df)
+    # pbfix_copy = deepcopy(pbfix)
+    #
+    #
+    # # x2 = df.copy() # todo should really be synth
+    # df_synth_tuned = pbfix.transform(df_synth[['age', 'education']])

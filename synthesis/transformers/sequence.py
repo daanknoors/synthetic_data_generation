@@ -1,4 +1,4 @@
-"""A module for pre/postprocessing dates
+"""Classes for transforming sequential data
 """
 
 import numpy as np
@@ -10,6 +10,11 @@ from pathlib import Path
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_random_state
+
+
+class FlattenSequentialRecords(TransformerMixin, BaseEstimator):
+    pass
+
 
 class GeneralizeDateSequence(TransformerMixin, BaseEstimator):
 
