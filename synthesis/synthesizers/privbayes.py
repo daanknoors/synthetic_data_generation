@@ -76,7 +76,9 @@ class PrivBayes(BaseDPSynthesizer):
                 max_parent_sets = self._max_parent_sets(data, nodes_selected, max_domain_size)
 
                 # empty set - no parents found that meet domain size restrictions
-                if len(max_parent_sets) == 1 and len(max_parent_sets[0]) == 0:
+                if len(max_parent_sets) == 0:
+                    node_parent_pairs.append(NodeParentPair(node, parents=None))
+                elif len(max_parent_sets) == 1 and len(max_parent_sets[0]) == 0:
                     node_parent_pairs.append(NodeParentPair(node, parents=None))
                 else:
                     node_parent_pairs.extend([
@@ -261,7 +263,7 @@ if __name__ == "__main__":
     df = df.loc[:, columns]
     print(df.head())
 
-    pb = PrivBayes()
+    pb = PrivBayes(epsilon=0.1)
     pb.fit(df)
     df_synth = pb.sample()
     pb.score(df, df_synth, score_dict=True)
