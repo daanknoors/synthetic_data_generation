@@ -100,7 +100,7 @@ class PrivBayes(BaseDPSynthesizer):
     def _max_domain_size(self, data, node):
         """Computes the maximum domain size a node can have to satisfy theta-usefulness"""
         node_cardinality = utils.cardinality(data[node])
-        max_domain_size = self.n_records_fit_ * (1 - self.epsilon_split) / \
+        max_domain_size = self.n_records_fit_ * (1 - self.epsilon_split) * self.epsilon / \
                           (2 * len(self.columns_) * self.theta_usefulness * node_cardinality)
         return max_domain_size
 
@@ -178,7 +178,7 @@ class PrivBayes(BaseDPSynthesizer):
 
     def _exponential_mechanism(self, X, node_parent_pairs, scores):
         # todo check if dp correct -> e.g. 2*scaling?
-        scaling_factors = self._compute_scaling_factor(X, node_parent_pairs)
+        scaling_factors = self._compute_scaling_factor(node_parent_pairs)
         sampling_distribution = np.exp(scores / 2 * scaling_factors)
         normalized_sampling_distribution = sampling_distribution / sampling_distribution.sum()
         pair_idx = np.arange(len(node_parent_pairs))
@@ -186,7 +186,7 @@ class PrivBayes(BaseDPSynthesizer):
         sampled_pair = node_parent_pairs[sampled_pair_idx]
         return sampled_pair
 
-    def _compute_scaling_factor(self, X, node_parent_pairs):
+    def _compute_scaling_factor(self, node_parent_pairs):
         n_records = self.n_records_fit_
         scaling_factors = np.empty(len(node_parent_pairs))
 
