@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from synthesis.synthesizers._base import BaseDPSynthesizer, FixedSamplingMixin
-from synthesis.synthesizers.utils import dp_contingency_table, get_size_contingency_table
+from synthesis.synthesizers.utils import dp_contingency_table, cardinality
 
 
 class ContingencySynthesizer(FixedSamplingMixin, BaseDPSynthesizer):
@@ -23,7 +23,7 @@ class ContingencySynthesizer(FixedSamplingMixin, BaseDPSynthesizer):
         self._check_init_args()
         data = self._check_input_data(data)
 
-        ct_size = get_size_contingency_table(data)
+        ct_size = cardinality(data)
         print('Estimated size contingency table: {}'.format(ct_size))
 
         self.model_ = dp_contingency_table(data, self.epsilon)
