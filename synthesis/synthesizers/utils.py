@@ -87,7 +87,7 @@ def contingency_table(data):
 
 def joint_distribution(data):
     """Get joint distribution by normalizing contingency table"""
-    return JPT.from_data(data)
+    return contingency_table(data).normalize()
 
 def marginal_distribution(data):
     assert len(data.shape) == 1 or data.shape[1] == 1, "data can only consist of a single column"
@@ -98,6 +98,12 @@ def marginal_distribution(data):
     states = {data.name: marginal.index.tolist()}
     return Factor(marginal, states=states)
 
+def compute_distribution(data):
+    """"Draws a marginal or joint distribution depending on the number of input dimensions"""
+    if len(data.shape) == 1 or data.shape[1] == 1:
+        return marginal_distribution(data)
+    else:
+        return joint_distribution(data)
 
 """Check and fix distributions"""
 
@@ -126,6 +132,14 @@ def _normalize_cpt(cpt):
     series_norm_full = series_norm_full.fillna(uniform_prob)
     return CPT(series_norm_full, cpt.states)
 
+def _ensure_arg_is_list(arg):
+    if not arg:
+        raise ValueError('Argument is empty: {}'.format(arg))
+
+    arg = [arg] if isinstance(arg, str) else arg
+    arg = list(arg) if isinstance(arg, tuple) else arg
+    assert isinstance(arg, list), "input argument should be either string, tuple or list"
+    return arg
 
 def cardinality(X):
     """Compute cardinality of input data"""

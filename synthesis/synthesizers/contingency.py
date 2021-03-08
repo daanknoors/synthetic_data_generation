@@ -20,8 +20,8 @@ class ContingencySynthesizer(FixedSamplingMixin, BaseDPSynthesizer):
         super().__init__(epsilon=epsilon, verbose=verbose)
 
     def fit(self, data):
-        self._check_init_args()
         data = self._check_input_data(data)
+        self._check_init_args()
 
         ct_size = cardinality(data)
         print('Estimated size contingency table: {}'.format(ct_size))

@@ -19,8 +19,9 @@ class MarginalSynthesizer(BaseDPSynthesizer):
         super().__init__(epsilon=epsilon, verbose=verbose)
 
     def fit(self, data):
-        self._check_init_args()
         data = self._check_input_data(data)
+        self._check_init_args()
+
 
         # divide epsilon budget over each column
         local_epsilon = self.epsilon / data.shape[1]
