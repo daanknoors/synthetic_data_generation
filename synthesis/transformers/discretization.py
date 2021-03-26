@@ -9,6 +9,7 @@ from pyhere import here
 
 from sklearn.utils.validation import check_array, FLOAT_DTYPES
 from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
+from sklearn.base import BaseEstimator, TransformerMixin
 
 from synthesis.synthesizers.utils import dp_marginal_distribution, _normalize_distribution
 from synthesis.evaluation import visual
@@ -281,6 +282,25 @@ def get_high_cardinality_features(X, threshold=50):
             high_cardinality_features.append(c)
     return high_cardinality_features
 
+
+class GeneralizeSchematic(TransformerMixin, BaseEstimator):
+    
+    def __init__(self, schema_dict):
+        self.schema_dict = schema_dict
+
+    def fit(self, col=None):
+        return self
+
+    def transform(self, col):
+        """Replaces all values in col with its generalized form in schema dict"""
+
+        to_check = list(self.schema_dict.keys())
+        to_check += ['nan', np.nan] # Allow nan values in column
+
+        # Check if all values in column are also in schema dict as keys
+        assert all([val in to_check for val in col]), "Column contains values not in schema dict"
+        
+        return col.replace(self.schema_dict)
 
 # class GeneralizeCategorical(GeneralizeContinuous):
 #
