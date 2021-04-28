@@ -68,7 +68,7 @@ def dp_conditional_distribution(data, epsilon, conditioned=None):
     """Compute differentially private conditional distribution of input data
     Inferred from marginal or joint distribution"""
     # if only one columns (series or dataframe), i.e. no conditioning columns
-    if len(data.shape) == 1 or data.shape[1] == 1:
+    if len(data.squeeze().shape) == 1:
         dp_distribution = dp_marginal_distribution(data, epsilon=epsilon)
     else:
         dp_distribution = dp_joint_distribution(data, epsilon=epsilon)
@@ -90,7 +90,7 @@ def joint_distribution(data):
     return contingency_table(data).normalize()
 
 def marginal_distribution(data):
-    assert len(data.shape) == 1 or data.shape[1] == 1, "data can only consist of a single column"
+    assert len(data.squeeze().shape) == 1, "data can only consist of a single column"
     # converts single column dataframe to series
     data = data.squeeze()
 
@@ -100,7 +100,7 @@ def marginal_distribution(data):
 
 def compute_distribution(data):
     """"Draws a marginal or joint distribution depending on the number of input dimensions"""
-    if len(data.shape) == 1 or data.shape[1] == 1:
+    if len(data.squeeze().shape) == 1:
         return marginal_distribution(data)
     else:
         return joint_distribution(data)

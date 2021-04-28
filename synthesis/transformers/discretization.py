@@ -5,24 +5,48 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from pyhere import here
-
 from sklearn.utils.validation import check_array, FLOAT_DTYPES
 from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
+from sklearn.base import BaseEstimator, TransformerMixin
 
-from synthesis.synthesizers.utils import dp_marginal_distribution, _normalize_distribution
+
+from synthesis.synthesizers.utils import dp_marginal_distribution, _normalize_distribution, _ensure_arg_is_list
 from synthesis.evaluation import visual
 
 
+class HierarchicalEncoder(TransformerMixin, BaseEstimator):
+    """Fit multiple encoders on one attribute and transform data with desired encoding level"""
+
+    def __init__(self, encoders):
+        self.encoders = encoders # list of encoders for one attribute
+        self.encoding_cardinality = [e.n_bins for e in self.encoders]
+
+    def fit(self, data):
+        for encoder in self.encoders:
+            encoder.fit(data)
+        return self
+
+    def transform(self, data, level=0):
+        assert level <= len(self.encoders), "Level should not exceed the number of encoders available"
+        if level == 0:
+            return data
+        selected_encoder = self.encoders[level-1]
+        return selected_encoder.transform(data)
+
+    def __repr__(self):
+        """x.__repr__() <==> repr(x)"""
+        msg = f"HierarchicalEncoder(encoders={self.encoders})"
+        return msg
 
 class GeneralizeContinuous(KBinsDiscretizer):
 
-    def __init__(self, n_bins=10, strategy='uniform', labeled_missing=None):
+    def __init__(self, n_bins=10, strategy='uniform', labeled_missing=None, enable_inverse=True):
         super().__init__(n_bins=n_bins, strategy=strategy, encode='ordinal')
         # self.n_bins = n_bins
         # self.strategy = strategy
 
         self.labeled_missing = labeled_missing
+        self.enable_inverse = enable_inverse
 
     def fit(self, X, y=None):
         """
@@ -38,6 +62,8 @@ class GeneralizeContinuous(KBinsDiscretizer):
         -------
         self
         """
+        if isinstance(X, pd.Series):
+            X = X.to_frame()
         self._infer_numerical_type(X)
         self._header = X.columns
 
@@ -103,6 +129,9 @@ class GeneralizeContinuous(KBinsDiscretizer):
             Data in the binned space.
         """
         # check_is_fitted(self, attributes=None)
+
+        if isinstance(X, pd.Series):
+            X = X.to_frame()
 
         Xt = check_array(X, copy=True, dtype=FLOAT_DTYPES, force_all_finite='allow-nan')
         n_features = self.n_bins_.shape[0]
@@ -176,8 +205,8 @@ class GeneralizeContinuous(KBinsDiscretizer):
 
 class GeneralizeCategorical(GeneralizeContinuous):
 
-    def __init__(self, epsilon=1.0, n_bins=5, strategy='uniform', max_cardinality=10):
-        super().__init__(n_bins=n_bins, strategy=strategy)
+    def __init__(self, epsilon=1.0, n_bins=5, strategy='uniform', max_cardinality=10, enable_inverse=True):
+        super().__init__(n_bins=n_bins, strategy=strategy, enable_inverse=enable_inverse)
         self.epsilon = epsilon
         self.max_cardinality = max_cardinality
 
@@ -272,7 +301,6 @@ class GeneralizeCategorical(GeneralizeContinuous):
         return pd.DataFrame(X_inv, columns=self._header)
 
 
-
 def get_high_cardinality_features(X, threshold=50):
     """Get features with more unique values than the specified threshold."""
     high_cardinality_features = []
@@ -282,40 +310,6 @@ def get_high_cardinality_features(X, threshold=50):
     return high_cardinality_features
 
 
-# class GeneralizeCategorical(GeneralizeContinuous):
-#
-#     def __init__(self, epsilon=1.0, n_bins=10, strategy='uniform', labeled_missing=None):
-#         super().__init__(n_bins=n_bins, strategy=strategy, encode='ordinal')
-#         self.epsilon = epsilon
-#
-#     def fit(self, X, y=None):
-#         # if user-specified bins in form of iterable or dict
-#         if self.bins:
-#             pass
-#
-#         self.marginals_ = {}
-#         self._ordinalencoders = {}
-#         X_enc = np.empty_like(X)
-#         for jj, c in enumerate(X.columns):
-#             uniques = sorted(set(X[c]))
-#             uniques, counts = X[c].value_counts(dropna=False)
-#
-#             local_epsilon = self.epsilon / X.shape[1]
-#             self.marginals_[c] = dp_marginal_distribution(X[c], local_epsilon)
-#
-#             # get numeric values - store encoder for inverse transform
-#             self._ordinalencoders[c] = OrdinalEncoder().fit(X[c])
-#             X_enc[:, jj] = self._ordinalencoders[c].transform(X[c])
-#
-#
-#         return super().fit(X_enc, y)
-#
-#     def inverse_transform(self, Xt):
-#         X_enc = super().inverse_transform(Xt)
-#         for jj in range(X_enc.shape[1]):
-#             # todo fix column names indexing
-#             # todo ensure inverse gives back X_enc which OrdinalEncoder.inverse_transform(X_le)
-#             pass
 
 
 
@@ -340,7 +334,7 @@ if __name__ == '__main__':
     # print(X_inv)
     # print(gen_cont.bin_edges_)
 
-    data_path = here("examples/data/input/adult_9c.csv")
+    data_path = "../../examples/data/input/adult_9c.csv"
     df = pd.read_csv(data_path, delimiter=', ').astype(str)
     print(df.head())
     df_s = df[['native-country', 'occupation']]

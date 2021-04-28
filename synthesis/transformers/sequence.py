@@ -3,13 +3,10 @@
 
 import numpy as np
 import pandas as pd
-import datetime
-from pyhere import here
 from pathlib import Path
 
 
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.utils import check_random_state
 
 
 class FlattenSequentialRecords(TransformerMixin, BaseEstimator):
