@@ -17,7 +17,7 @@ from synthesis.synthesizers._base import BaseDPSynthesizer
 from thomas.core.bayesiannetwork import BayesianNetwork
 from diffprivlib.mechanisms import Exponential
 
-AP_pair = namedtuple('AttributeParentPair', ['node', 'parents'])
+APPair = namedtuple('AttributeParentPair', ['node', 'parents'])
 
 
 class PrivBayes(BaseDPSynthesizer):
@@ -62,7 +62,7 @@ class PrivBayes(BaseDPSynthesizer):
         if self.score_function.upper() == 'R':
             self._score_sensitivity = (3 / self.n_records_fit_) + (2 / self.n_records_fit_**2)
 
-        # note: for simplicity we assume that all AP_pairs are non-binary, which is the upperbound of MI sensitivity
+        # note: for simplicity we assume that all APPairs are non-binary, which is the upperbound of MI sensitivity
         elif self.score_function.upper() == 'MI':
             self._score_sensitivity = (2 / self.n_records_fit_) * np.log((self.n_records_fit_ + 1) / 2) + \
                               (((self.n_records_fit_ - 1) / self.n_records_fit_) *
@@ -97,13 +97,13 @@ class PrivBayes(BaseDPSynthesizer):
 
                 # empty set - domain size of node violates theta_usefulness
                 if len(max_parent_sets) == 0:
-                    ap_pairs.append(AP_pair(node, parents=None))
+                    ap_pairs.append(APPair(node, parents=None))
                 # [empty set] - no parents found that meet domain size restrictions
                 elif len(max_parent_sets) == 1 and len(max_parent_sets[0]) == 0:
-                    ap_pairs.append(AP_pair(node, parents=None))
+                    ap_pairs.append(APPair(node, parents=None))
                 else:
                     ap_pairs.extend([
-                        AP_pair(node, parents=tuple(p)) for p in max_parent_sets
+                        APPair(node, parents=tuple(p)) for p in max_parent_sets
                     ])
             if self.verbose:
                 print("Number of AttributeParentPair candidates: {}".format(len(ap_pairs)))
@@ -168,14 +168,14 @@ class PrivBayes(BaseDPSynthesizer):
         nodes_selected = set()
 
         root = np.random.choice(tuple(nodes))
-        self.network_.append(AP_pair(node=root, parents=None))
+        self.network_.append(APPair(node=root, parents=None))
         nodes_selected.add(root)
         if self.verbose:
             print("1/{} - Root of network: {}\n".format(X.shape[1], root))
         return nodes, nodes_selected
 
     def set_network(self, network):
-        assert [isinstance(n, AP_pair) for n in network], "input network does not consists of AP_pairs"
+        assert [isinstance(n, APPair) for n in network], "input network does not consists of APPairs"
         self.network_init = network
         return self
 
@@ -193,7 +193,7 @@ class PrivBayes(BaseDPSynthesizer):
         return scores
 
     def _exponential_mechanism(self, ap_pairs, scores):
-        """select AP_pair with exponential mechanism"""
+        """select APPair with exponential mechanism"""
         local_epsilon = self.epsilon * self.epsilon_split / self._n_nodes_dp_computed
         dp_mech = Exponential(epsilon=local_epsilon, sensitivity=self._score_sensitivity,
                               utility=list(scores), candidates=ap_pairs)

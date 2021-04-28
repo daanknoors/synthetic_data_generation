@@ -5,8 +5,6 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from pyhere import here
-
 from sklearn.utils.validation import check_array, FLOAT_DTYPES
 from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -360,7 +358,7 @@ if __name__ == '__main__':
     # print(X_inv)
     # print(gen_cont.bin_edges_)
 
-    data_path = here("examples/data/input/adult_9c.csv")
+    data_path = "examples/data/input/adult_9c.csv"
     df = pd.read_csv(data_path, delimiter=', ').astype(str)
     print(df.head())
     df_s = df[['native-country', 'occupation']]
