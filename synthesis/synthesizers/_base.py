@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-import pickle
+import dill
 
 from abc import ABC, abstractmethod
 from copy import copy
@@ -112,7 +112,7 @@ class BaseDPSynthesizer(ABC):
             Path where the synthesizer instance is saved.
         """
         with open(path, 'wb') as output:
-            pickle.dump(self, output)
+            dill.dump(self, output)
 
     @classmethod
     def load(cls, path):
@@ -128,7 +128,7 @@ class BaseDPSynthesizer(ABC):
             Returns synthesizer instance.
         """
         with open(path, 'rb') as f:
-            return pickle.load(f)
+            return dill.load(f)
 
     def _check_init_args(self):
         """Check arguments provided at object instantiation"""
