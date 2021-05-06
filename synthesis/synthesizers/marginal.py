@@ -30,7 +30,7 @@ class MarginalSynthesizer(BaseDPSynthesizer):
         self.model_ = {}
         for c in data.columns:
             marginal = dp_marginal_distribution(data[c], local_epsilon)
-            self.model_[c] = marginal.to_dict()
+            self.model_[c] = dict(zip(marginal.as_dict()['states'][c], marginal.as_dict()['data']))
             if self.verbose:
                 print('Marginal fitted: {}'.format(c))
         return self
