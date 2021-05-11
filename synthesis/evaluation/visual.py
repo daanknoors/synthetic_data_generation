@@ -8,23 +8,6 @@ from lifelines import KaplanMeierFitter
 from synthesis.evaluation import metrics
 
 
-def plot_feature_distances(x1, x2, labels=None):
-    x1 = x1.copy().astype(str).replace('\.0', '', regex=True)
-    x2 = x2.copy().astype(str).replace('\.0', '', regex=True)
-
-    if labels is None:
-        labels = ['x1', 'x2']
-
-    features, feature_distances = metrics.feature_distances(x1, x2)
-    y_pos = np.arange(len(features))
-
-    plt.barh(y_pos, feature_distances)
-    plt.yticks(y_pos, features)
-    plt.xlim(0, 1)
-    plt.xlabel('Feature distance')
-    plt.title('Distances per feature')
-    plt.tight_layout()
-    plt.show()
 
 
 def compare_value_counts(x1, x2):
