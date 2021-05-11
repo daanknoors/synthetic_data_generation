@@ -4,23 +4,33 @@ from abc import ABC, abstractmethod
 
 
 class BaseMetric(ABC):
-    """A metric that stores scores_ each tiem score is run with a different name """
 
     def __init__(self):
+        pass
 
-
-    def score(self, name, data_original, data_synth, data_validation=None):
-        self._check_saved_scores(name)
+    def score(self, data_original, data_synth):
         pass
 
     def plot(self, data_original, data_synth):
         pass
 
-    def _check_data_alignment(self, data_original, data_synth, data_validation):
+    # def __repr__(self):
+    #     msg = f"{self.__class__.__name__}(score='{self.score_}')"
+    #     return msg
+
+class BaseStatistic(ABC):
+
+    def __init__(self):
         pass
 
-    def _check_saved_scores(self, name):
-        if not hasattr(self, 'scores_'):
-            self.scores_ = {}
-        if not self.scores_[name]:
-            self.scores_[name] = {}
+    def describe(self, data):
+        pass
+
+
+class BaseModel(ABC):
+
+    def __init__(self):
+        pass
+
+    def fit(self, data):
+        pass

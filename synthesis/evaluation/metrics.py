@@ -2,9 +2,54 @@
 
 import numpy as np
 import pandas as pd
-from pyhere import here
 
 from scipy.spatial.distance import jensenshannon
+
+from synthesis.evaluation._base import BaseMetric
+
+class JSDistanceColumns(BaseMetric):
+
+    def score(self, data_original, data_synth):
+        """Calculate jensen_shannon distance between original and synthetic data.
+        Look for more elaborate evaluation techniques in synthesis.evaluation.
+
+        Parameters
+        ----------
+        data_original: pandas.DataFrame
+            Original data that was seen in fit
+        data_synth: pandas.DataFrame
+            Synthetic data that was generated based on original data
+        Returns
+        -------
+        per-column jensen_shannon distance (if score_dict): dict
+            Per-column jensen_shannon distance
+        """
+        column_distances = {}
+        for i, c in enumerate(data_original.columns):
+            # compute value_counts for both original and synthetic - align indexes as certain column
+            # values in the original data may not have been sampled in the synthetic data
+            counts_original, counts_synthetic = \
+                data_original[c].value_counts(dropna=False).align(
+                    data_synth[c].value_counts(dropna=False), join='outer', axis=0, fill_value=0
+                )
+
+            js_distance = jensenshannon(counts_original, counts_synthetic)
+            column_distances[c] = js_distance
+        self.score_ = column_distances
+        return self.score_
+
+class JSDistanceAverage(JSDistanceColumns):
+    """
+    Returns
+    -------
+    average jensen_shannon distance: float
+        Average jensen_shannon distance over all columns
+    """
+
+    def score(self, data_original, data_synth):
+        column_distances = super().score(data_original, data_synth)
+        self.score_ = sum(column_distances.values()) / len(data_original.columns)
+        return self.score_
 
 
 def feature_distances(x1, x2, distance_function=None):
