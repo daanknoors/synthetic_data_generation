@@ -7,7 +7,6 @@ import seaborn as sns
 from scipy.spatial.distance import jensenshannon
 from dython.nominal import compute_associations
 
-
 from synthesis.evaluation._base import BaseMetric
 
 class JSDistanceColumns(BaseMetric):
@@ -30,6 +29,7 @@ class JSDistanceColumns(BaseMetric):
         per-column jensen_shannon distance (if score_dict): dict
             Per-column jensen_shannon distance
         """
+        data_original, data_synthetic = self._check_input_data(data_original, data_synthetic)
         self.stats_original_ = {}
         self.stats_synthetic_ = {}
         for c in data_original.columns:
@@ -49,7 +49,6 @@ class JSDistanceColumns(BaseMetric):
         return column_distances
 
     def plot(self):
-
         column_distances = self.score()
         columns = list(column_distances.keys())
         y_pos = np.arange(len(columns))
@@ -92,6 +91,7 @@ class Associations(BaseMetric):
         self.nominal_columns = 'auto'
 
     def fit(self, data_original, data_synthetic):
+        data_original, data_synthetic = self._check_input_data(data_original, data_synthetic)
         self.stats_original_ = compute_associations(data_original, theil_u=self.theil_u,
                                                      nominal_columns=self.nominal_columns)
         self.stats_synthetic_ = compute_associations(data_synthetic, theil_u=self.theil_u,
@@ -126,5 +126,5 @@ class Associations(BaseMetric):
         fig.suptitle('Association matrices', fontsize=14)
         plt.show()
 
-class KaplanMeier(BaseMetric):
-    pass
+
+

@@ -10,14 +10,14 @@ import synthesis.evaluation.metrics as metrics
 from synthesis.evaluation._base import BaseMetric
 
 
-METRICS = {
+DEFAULT_METRICS = {
     'js_distance_columns': metrics.JSDistanceColumns(),
     'js_distance_average': metrics.JSDistanceAverage(),
     'associations': metrics.Associations()
 }
 
 
-class SyntheticEvaluator():
+class SyntheticEvaluator(BaseMetric):
     def __init__(self, metrics=None):
         """Choose which metrics to compute"""
         self.metrics = metrics
@@ -42,33 +42,23 @@ class SyntheticEvaluator():
 
     def _check_input_args(self):
         if self.metrics is not None:
-            for m in metrics:
-                if not isinstance(m, BaseMetric):
-                    raise ValueError("Input metric {} should subclass synthesis.evaluation._base.BaseMetric".format(m))
+            for name, metric in metrics.items():
+                if not isinstance(metric, BaseMetric):
+                    raise ValueError("Input metric {} should subclass synthesis.evaluation._base.BaseMetric".format(metric))
         else:
-            self.metrics = METRICS
+            self.metrics = DEFAULT_METRICS
 
-    def _check_input_data(self, data_original, data_synthetic):
-        # ensure same columns order original data
-        data_synthetic = data_synthetic[data_original.columns]
-        # todo check data alignment, i.e. whether synthetic data has same columns and categories as original
-        # todo warn if dataset does not have same dimensions
-        return data_original, data_synthetic
 
 
 
 
 if __name__ == '__main__':
     path = Path('C:\\projects\\synthetic_data_generation\\examples\\data')
-    columns = ['workclass', 'education', 'relationship', 'occupation', 'age']
-    df = pd.read_csv(path / 'original/adult_8c.csv')[columns]
-    df_ms = pd.read_csv(path / 'synthetic/adult_8c_MarginalSynthesizer_0.01eps.csv')[columns]
-    df_pb = pd.read_csv(path / 'synthetic/adult_8c_PrivBayes_0.01eps.csv')[columns]
+    columns = ['age', 'workclass', 'education', 'relationship', 'occupation', 'income']
+    df = pd.read_csv(path / 'original/adult.csv')[columns]
+    df_ms = pd.read_csv(path / 'synthetic/adult_ms_1eps.csv')[columns]
+    df_pb = pd.read_csv(path / 'synthetic/adult_pb_1eps.csv')[columns]
 
-    df_synth = {
-        'MarginalSynthesizer': df_ms,
-        'PrivBayes': df_pb
-    }
 
     se = SyntheticEvaluator()
     se.fit(df, df_pb)

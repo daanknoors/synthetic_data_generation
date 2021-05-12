@@ -8,22 +8,6 @@ from lifelines import KaplanMeierFitter
 from synthesis.evaluation import metrics
 
 
-
-
-def compare_value_counts(x1, x2):
-    x1 = x1.copy().astype(str)
-    x2 = x2.copy().astype(str)
-    for c in x1.columns:
-        counts_X, counts_y = x1[c].value_counts(dropna=False).align(x2[c].value_counts(dropna=False), join='outer',
-                                                                   axis=0, fill_value=0)
-        df_compare = pd.concat([counts_X, counts_y], axis=1).astype(int)
-        df_compare.columns = ['x1', 'x2']
-
-        print('='*100)
-        print(c)
-        print(df_compare)
-
-
 def plot_kmf_comparison(datasets, dataset_names, T_varname, E_varname, G_varname):
     """
     Plot side-bys-side kaplan-meier of input datasets
