@@ -42,7 +42,7 @@ class SyntheticEvaluator(BaseMetric):
 
     def _check_input_args(self):
         if self.metrics is not None:
-            for name, metric in metrics.items():
+            for name, metric in self.metrics.items():
                 if not isinstance(metric, BaseMetric):
                     raise ValueError("Input metric {} should subclass synthesis.evaluation._base.BaseMetric".format(metric))
         else:
