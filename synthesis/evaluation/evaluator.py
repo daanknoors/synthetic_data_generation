@@ -16,7 +16,6 @@ DEFAULT_METRICS = {
     'associations': metrics.Associations()
 }
 
-
 class SyntheticEvaluator(BaseMetric):
     def __init__(self, metrics=None):
         """Choose which metrics to compute"""
@@ -47,10 +46,6 @@ class SyntheticEvaluator(BaseMetric):
                     raise ValueError("Input metric {} should subclass synthesis.evaluation._base.BaseMetric".format(metric))
         else:
             self.metrics = DEFAULT_METRICS
-
-
-
-
 
 if __name__ == '__main__':
     path = Path('C:\\projects\\synthetic_data_generation\\examples\\data')

@@ -92,7 +92,7 @@ class TrainBothTestOriginalHoldout(BasePredictiveMetric):
 
         preprocessor = ColumnTransformer(transformers=[
             ('num_scaling', MinMaxScaler(), numeric_features),
-            ('categorical_encoding', OneHotEncoder(drop='if_binary'), categorical_features)])
+            ('categorical_encoding', OneHotEncoder(handle_unknown='ignore'), categorical_features)])
 
         # Classifier
         clf_rf = RandomForestClassifier(class_weight='balanced', min_samples_leaf=0.05, random_state=self.random_state)
@@ -107,7 +107,8 @@ class TrainBothTestOriginalHoldout(BasePredictiveMetric):
                   'classifier__max_depth': [3, 5, 10],
                   'classifier__max_features': ['sqrt', 'log2']}
 
-        grid_rf = GridSearchCV(pipe, param_grid=params, scoring='roc_auc', refit=True, cv=5, verbose=2)
+        grid_rf = GridSearchCV(pipe, param_grid=params, scoring='roc_auc', refit=True, cv=5, verbose=2,
+                               n_jobs=self.n_jobs)
         grid_rf.fit(X, y)
         return grid_rf
 
