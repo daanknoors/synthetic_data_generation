@@ -15,7 +15,7 @@ from sklearn.metrics import roc_auc_score, plot_roc_curve
 from synthesis.evaluation._base import BaseMetric, BasePredictiveMetric
 
 
-class KaplanMeier(BaseMetric):
+class KaplanMeierComparison(BaseMetric):
 
     def __init__(self, time_column, event_column, group_column, labels=None):
         super().__init__(labels=labels)

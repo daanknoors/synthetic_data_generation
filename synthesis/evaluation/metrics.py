@@ -36,8 +36,8 @@ class JSDistanceColumns(BaseMetric):
             # compute value_counts for both original and synthetic - align indexes as certain column
             # values in the original data may not have been sampled in the synthetic data
             self.stats_original_[c], self.stats_synthetic_[c] = \
-                data_original[c].value_counts(dropna=False).align(
-                    data_synthetic[c].value_counts(dropna=False), join='outer', axis=0, fill_value=0
+                data_original[c].astype(str).value_counts(dropna=False).align(
+                    data_synthetic[c].astype(str).value_counts(dropna=False), join='outer', axis=0, fill_value=0
                 )
         return self
 
