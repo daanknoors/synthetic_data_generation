@@ -87,15 +87,19 @@ class Associations(BaseMetric):
 
     def __init__(self, theil_u=True, nominal_columns='auto', labels=None):
         super().__init__(labels=labels)
-        self.theil_u = True
-        self.nominal_columns = 'auto'
+        self.theil_u = theil_u
+        self.nominal_columns = nominal_columns
 
     def fit(self, data_original, data_synthetic):
         data_original, data_synthetic = self._check_input_data(data_original, data_synthetic)
+
+        # bug nominal.associations: fills nan values inplace
+        data_original = data_original.copy()
+        data_synthetic = data_synthetic.copy()
         self.stats_original_ = compute_associations(data_original, theil_u=self.theil_u,
-                                                     nominal_columns=self.nominal_columns)
+                                                     nominal_columns=self.nominal_columns, nan_replace_value='nan')
         self.stats_synthetic_ = compute_associations(data_synthetic, theil_u=self.theil_u,
-                                                     nominal_columns=self.nominal_columns)
+                                                     nominal_columns=self.nominal_columns, nan_replace_value='nan')
         return self
 
     def score(self):
