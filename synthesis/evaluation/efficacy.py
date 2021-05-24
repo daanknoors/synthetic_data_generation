@@ -107,7 +107,7 @@ class TrainBothTestOriginalHoldout(BasePredictiveMetric):
                   'classifier__max_depth': [3, 5, 10],
                   'classifier__max_features': ['sqrt', 'log2']}
 
-        grid_rf = GridSearchCV(pipe, param_grid=params, scoring='roc_auc', refit=True, cv=5, verbose=2,
+        grid_rf = GridSearchCV(pipe, param_grid=params, scoring='roc_auc', refit=True, cv=3, verbose=2,
                                n_jobs=self.n_jobs)
         grid_rf.fit(X, y)
         return grid_rf
