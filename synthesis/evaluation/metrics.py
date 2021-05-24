@@ -173,11 +173,9 @@ class ColumnComparison(BaseMetric):
             if len(column_value_counts_original.values) <= 20:
                 ax[idx].bar(x=bar_position + bar_width, height=column_value_counts_original.values,
                             color=COLOR_PALETTE[1], label=self.labels[0], width=bar_width)
-
             else:
                 ax[idx].plot(column_value_counts_original.index, column_value_counts_original.values, marker='o',
-                             markersize=5,
-                             color=COLOR_PALETTE[1], linewidth=2, label='original')
+                             markersize=4, color=COLOR_PALETTE[1], linewidth=2, label='original')
 
             ax[idx].set_xticks(bar_position + bar_width / 2)
             if len(column_value_counts_original.values) <= 20:

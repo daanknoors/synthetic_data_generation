@@ -5,7 +5,7 @@ Synthetic Data Generation via marginal distributions.
 import numpy as np
 import pandas as pd
 from synthesis.synthesizers._base import BaseDPSynthesizer
-from synthesis.synthesizers.utils import dp_marginal_distribution
+from synthesis.synthesizers.utils import dp_marginal_distribution, uniform_distribution
 
 
 class MarginalSynthesizer(BaseDPSynthesizer):
@@ -21,8 +21,6 @@ class MarginalSynthesizer(BaseDPSynthesizer):
     def fit(self, data):
         data = self._check_input_data(data)
         self._check_init_args()
-
-
         # divide epsilon budget over each column
         local_epsilon = self.epsilon / data.shape[1]
 
@@ -50,4 +48,23 @@ class MarginalSynthesizer(BaseDPSynthesizer):
                 print('Column sampled: {}'.format(c))
         return pd.DataFrame(synth_data)
 
+
+class UniformSynthesizer(MarginalSynthesizer):
+    """Synthetic Data Generation via uniform distribution.
+    """
+
+    def __init__(self, epsilon=1.0, verbose=True):
+        super().__init__(epsilon=epsilon, verbose=verbose)
+
+    def fit(self, data):
+        data = self._check_input_data(data)
+        self._check_init_args()
+
+        self.model_ = {}
+        for c in data.columns:
+            uniform = uniform_distribution(data[c])
+            self.model_[c] = dict(zip(uniform.as_dict()['states'][c], uniform.as_dict()['data']))
+            if self.verbose:
+                print('Uniform fitted: {}'.format(c))
+        return self
 

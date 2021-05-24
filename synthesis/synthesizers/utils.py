@@ -98,6 +98,15 @@ def marginal_distribution(data):
     states = {data.name: marginal.index.tolist()}
     return Factor(marginal, states=states)
 
+def uniform_distribution(data):
+    assert len(data.squeeze().shape) == 1, "data can only consist of a single column"
+    # converts single column dataframe to series
+    data = data.squeeze()
+    n_unique = data.nunique(dropna=False)
+    uniform = np.full(n_unique, 1/n_unique)
+    states = {data.name: data.unique().tolist()}
+    return Factor(uniform, states=states)
+
 def compute_distribution(data):
     """"Draws a marginal or joint distribution depending on the number of input dimensions"""
     if len(data.squeeze().shape) == 1:
