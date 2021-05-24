@@ -13,7 +13,8 @@ from synthesis.evaluation._base import BaseMetric
 DEFAULT_METRICS = {
     'js_distance_columns': metrics.JSDistanceColumns(),
     'js_distance_average': metrics.JSDistanceAverage(),
-    'associations': metrics.Associations()
+    'associations': metrics.Associations(),
+    'column_comparison': metrics.ColumnComparison()
 }
 
 class SyntheticEvaluator(BaseMetric):
