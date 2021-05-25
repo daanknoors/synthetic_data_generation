@@ -55,8 +55,8 @@ class MarginalComparison(BaseMetric):
                 ax[idx].bar(x=bar_position, height=column_value_counts_original.values,
                             color=COLOR_PALETTE[0], label=self.labels[0], width=bar_width)
             else:
-                ax[idx].plot(column_value_counts_original.index, column_value_counts_original.values, marker='o',
-                             markersize=4, color=COLOR_PALETTE[0], linewidth=2, label=self.labels[0])
+                ax[idx].plot(bar_position + bar_width, column_value_counts_original.values, marker='o',
+                             markersize=3, color=COLOR_PALETTE[0], linewidth=2, label=self.labels[0])
 
             # synthetic distribution
             ax[idx].bar(x=bar_position + bar_width, height=column_value_counts_synthetic.values,
