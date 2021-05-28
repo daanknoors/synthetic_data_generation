@@ -7,9 +7,8 @@ import seaborn as sns
 from scipy.spatial.distance import jensenshannon
 from dython.nominal import compute_associations
 
-from synthesis.evaluation._base import BaseMetric
+from synthesis.evaluation._base import BaseMetric, COLOR_PALETTE
 
-COLOR_PALETTE = ['#393e46', '#ff5722', '#d72323']
 
 class MarginalComparison(BaseMetric):
 

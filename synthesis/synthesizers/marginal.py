@@ -37,16 +37,18 @@ class MarginalSynthesizer(BaseDPSynthesizer):
         self._check_is_fitted()
         n_records = n_records or self.n_records_fit_
 
-        synth_data = {}
+        data_synth = {}
         # sample columns independently from marginal distributions
         for c in self.columns_:
             column_values = list(self.model_[c].keys())
             column_value_probabilities = list(self.model_[c].values())
             column_sampled = np.random.choice(column_values, p=column_value_probabilities, size=n_records, replace=True)
-            synth_data[c] = column_sampled
+            data_synth[c] = column_sampled
             if self.verbose:
                 print('Column sampled: {}'.format(c))
-        return pd.DataFrame(synth_data)
+        data_synth = pd.DataFrame(data_synth)
+        data_synth = self._check_output_data(data_synth)
+        return data_synth
 
 
 class UniformSynthesizer(MarginalSynthesizer):

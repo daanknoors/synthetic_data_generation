@@ -72,10 +72,12 @@ class PrivBayes(BaseDPSynthesizer):
         self._check_is_fitted()
         n_records = n_records or self.n_records_fit_
 
-        synth_data = self._generate_data(n_records)
+        data_synth = self._generate_data(n_records)
+        data_synth = self._check_output_data(data_synth)
+
         if self.verbose:
             print("\nSynthetic Data Generated\n")
-        return synth_data
+        return data_synth
 
     def _greedy_bayes(self, data):
         nodes, nodes_selected = self._init_network(data)
@@ -221,17 +223,17 @@ class PrivBayes(BaseDPSynthesizer):
         return self
 
     def _generate_data(self, n_records):
-        synth_data = np.empty([n_records, len(self.columns_)], dtype=object)
+        data_synth = np.empty([n_records, len(self.columns_)], dtype=object)
 
         for i in range(n_records):
             if self.verbose:
                 print('Number of records generated: {} / {}'.format(i + 1, n_records), end='\r')
             record = self._sample_record()
-            synth_data[i] = list(record.values())
+            data_synth[i] = list(record.values())
 
         # numpy.array to pandas.DataFrame with original column ordering
-        synth_data = pd.DataFrame(synth_data, columns=[c.node for c in self.network_])[self.columns_]
-        return synth_data
+        data_synth = pd.DataFrame(data_synth, columns=[c.node for c in self.network_])
+        return data_synth
 
     def _sample_record(self):
         """samples a value column for column by conditioning for parents"""

@@ -135,17 +135,32 @@ class BaseDPSynthesizer(ABC):
         self._check_epsilon()
 
     def _check_input_data(self, data):
-        """Check input dataset - save column names and number of records"""
-        # converts to dataframe in case of numpy input and make all columns categorical.
-        data = pd.DataFrame(data).astype(str, copy=False)
-
+        """Check input dataset - save column names, number of records and column dtypes"""
         # prevent integer column indexing issues
         data.columns = data.columns.astype(str)
 
         # store general information about input data to ensure synthetic data maintains the same structure
         self.columns_ = list(data.columns)
         self.n_records_fit_ = data.shape[0]
+        self.dtypes_fit_ = data.dtypes
+
+        # converts to dataframe in case of numpy input and make all columns categorical.
+        data = pd.DataFrame(data).astype(str, copy=False)
         return data
+
+    def _check_output_data(self, data_synth):
+        """Check if output is in same format input data."""
+        # convert dtypes back to original - first convert object to bool to prevent all values from becoming True
+        bool_cols = self.dtypes_fit_[self.dtypes_fit_ == bool].index
+        data_synth[bool_cols] = data_synth[bool_cols].replace({'False': False, 'True': True})
+        data_synth = data_synth.astype(self.dtypes_fit_)
+
+        # convert 'nan' to NaN
+        data_synth = data_synth.replace({'nan': np.nan})
+
+        # convert column order as seen in fit
+        data_synth = data_synth[self.columns_]
+        return data_synth
 
     def _check_epsilon(self):
         """Check whether epsilon is in range [0, float(np.inf)]"""

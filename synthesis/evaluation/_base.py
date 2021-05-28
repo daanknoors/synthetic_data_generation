@@ -1,6 +1,8 @@
 """Base classes for all metrics"""
 from abc import ABC, abstractmethod
 
+COLOR_PALETTE = ['#393e46', '#ff5722', '#d72323']
+
 class BaseMetric(ABC):
 
     def __init__(self, labels=None):
@@ -20,6 +22,7 @@ class BaseMetric(ABC):
         data_synthetic = data_synthetic[data_original.columns]
         # todo check data alignment, i.e. whether synthetic data has same columns and categories as original
         # todo warn if dataset does not have same dimensions
+        # todo convert column dtypes synthetic to original dtypes - warn user.
         return data_original, data_synthetic
 
 

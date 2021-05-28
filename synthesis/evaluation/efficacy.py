@@ -12,7 +12,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import roc_auc_score, plot_roc_curve
 
-from synthesis.evaluation._base import BaseMetric, BasePredictiveMetric
+from synthesis.evaluation._base import BaseMetric, BasePredictiveMetric, COLOR_PALETTE
 
 
 class KaplanMeierComparison(BaseMetric):
@@ -45,11 +45,11 @@ class KaplanMeierComparison(BaseMetric):
         Plot side-by-side kaplan-meier of input datasets
         """
 
-        figsize = (8, 6)
+        figsize = (10, 5)
         fig, ax = plt.subplots(1, 2, figsize=figsize, sharey=True)
 
-        sns.set(font_scale=1.5)
-        sns.despine()
+        # sns.set(font_scale=1.5)
+        # sns.despine()
         palette = ['#0d3d56', '#006887', '#0098b5', '#00cbde', '#00ffff']
 
         datasets = [self.stats_original_, self.stats_synthetic_]
@@ -58,13 +58,13 @@ class KaplanMeierComparison(BaseMetric):
             e = data['event']
 
             kmf = KaplanMeierFitter()
-            groups = np.sort(data[self.group_column].unique())
+            groups = np.sort(data['group'].unique())
             for g, color in zip(groups, palette):
                 mask = (data['group'] == g)
                 kmf.fit(t[mask], event_observed=e[mask], label=g)
                 ax_cur = kmf.plot_survival_function(ax=ax_cur, color=color)
                 ax_cur.legend(title=self.group_column)
-                ax_cur.set_title('Kaplan-Meier - {} Data'.format(label))
+                ax_cur.set_title('Kaplan-Meier - {} data'.format(label))
                 ax_cur.set_ylim(0, 1)
         plt.tight_layout()
 
@@ -126,8 +126,8 @@ class TrainBothTestOriginalHoldout(BasePredictiveMetric):
         X_test, y_test = self._split_xy(data_original_test)
 
         fig, ax = plt.subplots()
-        plot_roc_curve(self.stats_original_, X_test, y_test, ax=ax, name=self.labels[0])
-        plot_roc_curve(self.stats_synthetic_, X_test, y_test, ax=ax, name=self.labels[1])
+        plot_roc_curve(self.stats_original_, X_test, y_test, ax=ax, name=self.labels[0], color=COLOR_PALETTE[0])
+        plot_roc_curve(self.stats_synthetic_, X_test, y_test, ax=ax, name=self.labels[1], color=COLOR_PALETTE[1])
         ax.plot([0, 1], [0, 1], linestyle='--', lw=1, color='black', alpha=.8)
         plt.title('ROC Curve')
         plt.show()

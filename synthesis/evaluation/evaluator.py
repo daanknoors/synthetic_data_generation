@@ -46,6 +46,12 @@ class SyntheticEvaluator(BaseMetric):
         else:
             self.metrics = DEFAULT_METRICS
 
+
+class OriginalEvaluator():
+    """Class to evaluate input dataframe"""
+    def __init__(self):
+        pass
+
 if __name__ == '__main__':
     path = Path('C:\\projects\\synthetic_data_generation\\examples\\data')
     columns = ['age', 'workclass', 'education', 'relationship', 'occupation', 'income']
