@@ -39,7 +39,7 @@ class MarginalComparison(BaseMetric):
 
     def plot(self):
         column_names = self.stats_original_.keys()
-        fig, ax = plt.subplots(len(self.stats_original_.keys()), 1, figsize=(8, len(column_names) * 4))
+        fig, ax = plt.subplots(len(column_names), 1, figsize=(8, len(column_names) * 4))
 
         for idx, col in enumerate(column_names):
 

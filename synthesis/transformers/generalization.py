@@ -9,6 +9,7 @@ from sklearn.utils.validation import check_array, FLOAT_DTYPES
 from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
 from sklearn.base import BaseEstimator, TransformerMixin
 
+from synthesis.transformers._base import BaseReversibleTransformer
 from synthesis.synthesizers.utils import dp_marginal_distribution, _normalize_distribution
 from synthesis.evaluation import visual
 
@@ -299,6 +300,20 @@ class GeneralizeSchematic(TransformerMixin, BaseEstimator):
         assert all([val in to_check for val in col]), "Column contains values not in schema dict"
         
         return col.replace(self.schema_dict)
+
+class GroupRareCategories(BaseReversibleTransformer):
+    """Transformer to group rare categories"""
+
+    def __init__(self, threshold=0.05, name_group='Other'):
+        self.threshold = threshold
+        self.name_group = name_group
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        """Group categories that occur less then threshold"""
+        return X.mask(X.map(X.value_counts(normalize=True)) < self.threshold, self.name_group)
 
 # class GeneralizeCategorical(GeneralizeContinuous):
 #

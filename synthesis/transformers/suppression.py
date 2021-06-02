@@ -4,19 +4,19 @@ import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 
 
-class RemoveIdentifyingColumns:
-    """Transformer to remove identifying columns"""
+class RemoveColumns(TransformerMixin, BaseEstimator):
+    """Transformer to remove columns"""
 
     def __init__(self, remove_columns=None):
         self.remove_columns = remove_columns
 
-    def fit(self, data_original):
+    def fit(self, X, y=None):
         if self.remove_columns is None:
             raise ValueError('Specify columns to be removed when instantiating class.')
         return self
 
-    def transform(self, data_original):
-        return data_original.drop(columns=self.remove_columns)
+    def transform(self, X, y=None):
+        return X.drop(columns=self.remove_columns)
 
 
 class RemoveUniqueRows:
