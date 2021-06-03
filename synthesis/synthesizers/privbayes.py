@@ -227,7 +227,8 @@ class PrivBayes(BaseDPSynthesizer):
 
         for i in range(n_records):
             if self.verbose:
-                print('Number of records generated: {} / {}'.format(i + 1, n_records), end='\r')
+                print("\r", end='')
+                print('Number of records generated: {} / {}'.format(i + 1, n_records), end='', flush=True)
             record = self._sample_record()
             data_synth[i] = list(record.values())
 

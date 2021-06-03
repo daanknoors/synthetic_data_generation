@@ -25,7 +25,7 @@ install_requires = [
 # This call to setup() does all the work
 setup(
     name="synthetic-data-generation",
-    version="0.1.0",
+    version="0.1.1",
     description="Algorithms for generating synthetic data",
     long_description=README,
     long_description_content_type="text/markdown",
