@@ -19,18 +19,6 @@ class RemoveColumns(TransformerMixin, BaseEstimator):
         return X.drop(columns=self.remove_columns)
 
 
-class RemoveUniqueRows:
-    """Transformer to remove unique rows that occur less than threshold"""
-
-    def __init__(self, min_n_duplicates):
-        self.min_n_duplicates = min_n_duplicates
-
-    def fit(self, data_original):
-        pass
-    def transform(self, data_original):
-        pass
-
-
 class KeepFirstIdentifier(TransformerMixin, BaseEstimator):
     """Ensure that each person has only one record in the input data.
     Sort by 1 or more id_columns and only retain the first occurrence of the first id_column."""

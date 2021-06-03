@@ -10,8 +10,12 @@ README = (HERE / "README.md").read_text()
 install_requires = [
     'thomas-core',
     'diffprivlib',
+    'dill',
+    'lifelines',
+    'dython',
     'numpy',
     'pandas',
+    'scipy',
     'scikit-learn',
     'matplotlib',
     'seaborn'

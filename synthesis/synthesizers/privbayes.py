@@ -311,11 +311,9 @@ class PrivBayes(BaseDPSynthesizer):
         return l1_distance
 
 
-
-
 if __name__ == "__main__":
     data_path = '../../examples/data/original/adult.csv'
-    data = pd.read_csv(data_path, delimiter=', ', engine='python')
+    data = pd.read_csv(data_path, engine='python')
     columns = ['age', 'sex', 'education', 'workclass', 'income']
     data = data.loc[:, columns]
     print(data.head())
