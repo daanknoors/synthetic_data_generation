@@ -87,7 +87,7 @@ class PrivBayes(BaseDPSynthesizer):
 
         for i in range(len(nodes_selected), len(nodes)):
             if self.verbose:
-                print("{}/{} - Evaluating next node to add to network".format(i + 1, len(self.columns_)))
+                print("{}/{} - Evaluating next attribute to add to network".format(i + 1, len(self.columns_)))
 
             nodes_remaining = nodes - nodes_selected
 
@@ -109,13 +109,12 @@ class PrivBayes(BaseDPSynthesizer):
                     ])
             if self.verbose:
                 print("Number of AttributeParentPair candidates: {}".format(len(ap_pairs)))
-                print('Candidates: {}'.format(ap_pairs))
 
             scores = self._compute_scores(data, ap_pairs)
             sampled_pair = self._exponential_mechanism(ap_pairs, scores)
 
             if self.verbose:
-                print("Selected node: '{}' - with parents: {}\n".format(sampled_pair.node, sampled_pair.parents))
+                print("Selected attribute: '{}' - with parents: {}\n".format(sampled_pair.node, sampled_pair.parents))
             nodes_selected.add(sampled_pair.node)
             self.network_.append(sampled_pair)
         if self.verbose:

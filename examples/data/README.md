@@ -5,6 +5,7 @@ This folder contains publicly available (non-sensitive) data. This data is used 
 We make the following distinction:
 - original data: input to synthesizers
 - synthetic data: output of synthesizers
+- thesaurus: tables used to convert column values
 
 
 # Data sources

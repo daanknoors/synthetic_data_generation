@@ -188,6 +188,7 @@ class GeneralizeCategorical(GeneralizeContinuous):
         2. Store DP marginal counts for optional inverse transform
         3. Run super().fit() to get groups
         """
+        X = X.astype(str).fillna('missing')
         self._ordinalencoder = OrdinalEncoder().fit(X)
         #todo: turn into numpy -> df needed for marginal distribution
         X_enc = self._ordinalencoder.transform(X)
@@ -204,6 +205,7 @@ class GeneralizeCategorical(GeneralizeContinuous):
 
     def transform(self, X):
         """Equivalent to continuous transform but we still need to encode the data beforehand"""
+        X = X.astype(str).fillna('missing')
         X_enc = self._ordinalencoder.transform(X)
         return super().transform(X_enc)
 
@@ -284,22 +286,25 @@ def get_high_cardinality_features(X, threshold=50):
 
 class GeneralizeSchematic(TransformerMixin, BaseEstimator):
     
-    def __init__(self, schema_dict):
+    def __init__(self, schema_dict, label_unknown=None):
         self.schema_dict = schema_dict
+        self.label_unknown = label_unknown
 
-    def fit(self, col=None):
+    def fit(self, X, y=None):
         return self
 
-    def transform(self, col):
+    def transform(self, X, y=None):
         """Replaces all values in col with its generalized form in schema dict"""
 
-        to_check = list(self.schema_dict.keys())
-        to_check += ['nan', np.nan] # Allow nan values in column
-
-        # Check if all values in column are also in schema dict as keys
-        assert all([val in to_check for val in col]), "Column contains values not in schema dict"
+        # convert categories not present in schema to value given for label_unknown
+        if self.label_unknown:
+            X[~X.isin(self.schema_dict.keys())] = self.label_unknown
         
-        return col.replace(self.schema_dict)
+        return X.replace(self.schema_dict)
+
+    def inverse_transform(self, X):
+        pass
+
 
 class GroupRareCategories(BaseReversibleTransformer):
     """Transformer to group rare categories"""

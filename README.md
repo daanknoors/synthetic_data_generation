@@ -11,7 +11,7 @@ We support the following synthesizers:
 
 ## Install
 
-Using 'pip':
+Using `pip`:
 
 ```bash
 pip install synthetic-data-generation
@@ -25,7 +25,7 @@ import pandas as pd
 from synthesis.synthesizers import PrivBayes
 
 # load data
-df = pd.read_csv('examples/data/input/adult.csv')
+df = pd.read_csv('examples/data/original/adult.csv')
 
 # set desired privacy level (differential privacy) - default = 1
 epsilon = 0.1
