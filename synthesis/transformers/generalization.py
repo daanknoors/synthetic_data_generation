@@ -4,6 +4,7 @@
 import numpy as np
 import pandas as pd
 import warnings
+from collections import defaultdict
 
 from sklearn.utils.validation import check_array, FLOAT_DTYPES
 from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
@@ -295,15 +296,35 @@ class GeneralizeSchematic(TransformerMixin, BaseEstimator):
 
     def transform(self, X, y=None):
         """Replaces all values in col with its generalized form in schema dict"""
+        Xt = X.copy()
 
         # convert categories not present in schema to value given for label_unknown
         if self.label_unknown:
-            X[~X.isin(self.schema_dict.keys())] = self.label_unknown
+            Xt[~Xt.isin(self.schema_dict.keys())] = self.label_unknown
         
-        return X.replace(self.schema_dict)
+        return Xt.replace(self.schema_dict)
+
+    def _reverse_schema(self):
+        """reverse schema dict with non-unique values"""
+        reversed_dict = defaultdict(list)
+
+        for key, value in self.schema_dict.items():
+            reversed_dict[value].append(key)
+        return reversed_dict
 
     def inverse_transform(self, X):
-        pass
+        """reverse the schema by sampling from the available candidates"""
+        reversed_schema = self._reverse_schema()
+        X_generalized = X.values
+        X_sampled = np.empty_like(X)
+        for i in range(len(X)):
+            reverse_candidates = reversed_schema[X_generalized[i]]
+
+            if reverse_candidates:
+                X_sampled[i] = np.random.choice(reverse_candidates)
+            else:
+                X_sampled[i] = X_generalized[i]
+        return X_sampled
 
 
 class GroupRareCategories(BaseReversibleTransformer):
