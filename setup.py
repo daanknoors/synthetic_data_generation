@@ -10,8 +10,8 @@ README = (HERE / "README.md").read_text()
 install_requires = [
     'thomas-core',
     'diffprivlib',
-    'janitor',
-    'pandas-flavor'
+    'pyjanitor',
+    'pandas-flavor',
     'dill',
     'lifelines',
     'dython',
