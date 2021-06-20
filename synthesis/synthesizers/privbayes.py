@@ -311,7 +311,7 @@ class PrivBayes(BaseDPSynthesizer):
         return l1_distance
 
 
-class PrivBayesFix(FixedSamplingMixin, PrivBayes):
+class PrivBayesFix(PrivBayes):
     """Extension to PrivBayes class to allow user to fix pre-sampled columns. Can be used to generate additional items
     for an already released synthetic dataset.
     """
@@ -335,7 +335,6 @@ class PrivBayesFix(FixedSamplingMixin, PrivBayes):
         if self.verbose:
             print("\nRemaining synthetic columns generated")
         return data_synth
-
 
     def _generate_data(self, fixed_data):
         n_records = fixed_data.shape[0]
@@ -375,6 +374,25 @@ class PrivBayesFix(FixedSamplingMixin, PrivBayes):
             record[node.name] = sampled_node_value
         return record
 
+    def _check_fixed_data(self, data):
+        """Checks whether the columns in fixed data where also seen in fit"""
+        if isinstance(data, pd.Series):
+            data = data.to_frame()
+
+        if not np.all([c in self.columns_ for c in data.columns]):
+            raise ValueError('Columns in fixed data not seen in fit.')
+        if set(data.columns) == set(self.columns_):
+            raise ValueError('Fixed data already contains all the columns that were seen in fit.')
+
+        if self.verbose:
+            sample_columns = [c for c in self.columns_ if c not in data.columns]
+            print('Columns sampled and added to fixed data: {}'.format(sample_columns))
+        # prevent integer column indexing issues
+        data.columns = data.columns.astype(str)
+        # make all columns categorical.
+        data = data.astype(str)
+        return data
+
 if __name__ == "__main__":
     data_path = '../../examples/data/original/adult.csv'
     data = pd.read_csv(data_path, engine='python')
@@ -408,7 +426,6 @@ if __name__ == "__main__":
     pbfix.set_network(init_network)
     pbfix.fit(data)
     df_synth_remaining = pbfix.sample_remaining_columns(df_synth[['age', 'education']])
-    df_synth_remaining = pbfix.sample_remaining_columns(df_synth['age'])
 
 
     """test scoring functions"""
