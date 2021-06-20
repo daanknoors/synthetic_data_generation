@@ -96,7 +96,7 @@ class ContingencySynthesizerFix(ContingencySynthesizer, FixedSamplingMixin):
 
     def slice_contingency_table(self, column, value):
         """Return slice of contingency table based on conditioning variable"""
-        condition_idx = self.model_.index.get_level_values(column) == value
+        condition_idx = self.model_.get_pandas_index().get_level_values(column) == value
         return self.model_[condition_idx]
 
 
