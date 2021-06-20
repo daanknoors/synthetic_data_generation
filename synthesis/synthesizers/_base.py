@@ -205,22 +205,30 @@ class FixedSamplingMixin:
 
     def _check_fixed_data(self, fixed_data):
         """Checks whether the columns in fixed data where also seen in fit"""
-        if isinstance(fixed_data, pd.Series):
-            if fixed_data.name not in self.columns_:
-                raise ValueError("Columns in fixed data not seen in fit.")
+
         if isinstance(fixed_data, pd.DataFrame):
             if not np.all([c in self.columns_ for c in fixed_data.columns]):
                 raise ValueError('Columns in fixed data not seen in fit.')
             if set(fixed_data.columns) == set(self.columns_):
                 raise ValueError('Fixed data already contains all the columns that were seen in fit.')
 
-            for c in fixed_data.columns:
-                assert set(np.unique(self.model_.index.get_level_values(c))) == \
-                    set(np.unique(fixed_data[c])), 'conditioning variable has different categories for column: {}'.format(c)
+            # for c in fixed_data.columns:
+            #     assert set(np.unique(self.model_.index.get_level_values(c))) == \
+            #         set(np.unique(fixed_data[c])), 'conditioning variable has different categories for column: {}'.format(c)
 
             if self.verbose:
                 sample_columns = [c for c in self.columns_ if c not in fixed_data.columns]
                 print('Columns sampled and added to fixed data: {}'.format(sample_columns))
+        if isinstance(fixed_data, pd.Series):
+            if fixed_data.name not in self.columns_:
+                raise ValueError("Columns in fixed data not seen in fit.")
+            fixed_data = fixed_data.to_frame()
+
+        # prevent integer column indexing issues
+        fixed_data.columns = fixed_data.columns.astype(str)
+        # converts to dataframe in case of numpy input and make all columns categorical.
+        fixed_data = pd.DataFrame(fixed_data).astype(str, copy=False)
+        return fixed_data
 
 class NotFittedError(Exception):
     """Exception to indicate that the synthesizer is not fitted yet"""

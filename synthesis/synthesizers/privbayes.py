@@ -13,8 +13,8 @@ from sklearn.metrics import mutual_info_score
 from collections import namedtuple
 
 import synthesis.synthesizers.utils as utils
-from synthesis.synthesizers._base import BaseDPSynthesizer
-from thomas.core.bayesiannetwork import BayesianNetwork
+from synthesis.synthesizers._base import BaseDPSynthesizer, FixedSamplingMixin
+from thomas.core import BayesianNetwork
 from diffprivlib.mechanisms import Exponential
 
 APPair = namedtuple('AttributeParentPair', ['node', 'parents'])
@@ -311,6 +311,70 @@ class PrivBayes(BaseDPSynthesizer):
         return l1_distance
 
 
+class PrivBayesFix(FixedSamplingMixin, PrivBayes):
+    """Extension to PrivBayes class to allow user to fix pre-sampled columns. Can be used to generate additional items
+    for an already released synthetic dataset.
+    """
+
+    def __init__(self, epsilon=1.0, theta_usefulness=4, epsilon_split=0.3,
+                 score_function='R', network_init=None, verbose=True):
+        super().__init__(epsilon=epsilon, theta_usefulness=theta_usefulness, epsilon_split=epsilon_split,
+                         score_function=score_function, network_init=network_init, verbose=verbose)
+
+    def fit(self, data):
+        super().fit(data)
+        return self
+
+    def sample_remaining_columns(self, fixed_data):
+        self._check_is_fitted()
+        fixed_data = self._check_fixed_data(fixed_data)
+
+        data_synth = self._generate_data(fixed_data)
+        data_synth = self._check_output_data(data_synth)
+
+        if self.verbose:
+            print("\nRemaining synthetic columns generated")
+        return data_synth
+
+
+    def _generate_data(self, fixed_data):
+        n_records = fixed_data.shape[0]
+        data_synth = np.empty([n_records, len(self.columns_)], dtype=object)
+
+        for i in range(n_records):
+            if self.verbose:
+                print("\r", end='')
+                print('Number of records generated: {} / {}'.format(i + 1, n_records), end='', flush=True)
+            record_init = fixed_data.loc[i].to_dict()
+            record = self._sample_record(record_init)
+            data_synth[i] = list(record.values())
+
+        # numpy.array to pandas.DataFrame with original column ordering
+        data_synth = pd.DataFrame(data_synth, columns=[c.node for c in self.network_])
+        return data_synth
+
+    def _sample_record(self, record_init):
+        # assume X has columns with values that correspond to the first nodes in the network
+        # that we would like to fix and condition for.
+        record = record_init
+
+        # sample remaining nodes after fixing for input X
+        for col_idx, pair in enumerate(self.network_[len(record_init):]):
+            node = self.model_[pair.node]
+
+            # specify pre-sampled conditioning values
+            node_cpt = node.cpt
+            node_states = node.states
+
+            if node.conditioning:
+                parent_values = [record[p] for p in node.conditioning]
+                node_probs = node_cpt[tuple(parent_values)]
+            else:
+                node_probs = node_cpt.values
+            sampled_node_value = np.random.choice(node_states, p=node_probs)
+            record[node.name] = sampled_node_value
+        return record
+
 if __name__ == "__main__":
     data_path = '../../examples/data/original/adult.csv'
     data = pd.read_csv(data_path, engine='python')
@@ -332,6 +396,19 @@ if __name__ == "__main__":
     # pbinit.set_network(init_network)
     # pbinit.fit(df)
     # df_synth_init = pbinit.sample(1000)
+
+    # fixing a network - specify init network to fix those variables when generating
+    pbfix = PrivBayesFix(epsilon=1)
+    init_network = [APPair('age', None), APPair('education', ('age',))]
+    # init_network = [APPair(node='age', parents=None),
+    #                 APPair(node='education', parents=('age',)),
+    #                 APPair(node='sex', parents=('age', 'education')),
+    #                 APPair(node='workclass', parents=('age', 'education')),
+    #                 APPair(node='income', parents=('sex', 'age'))]
+    pbfix.set_network(init_network)
+    pbfix.fit(data)
+    df_synth_remaining = pbfix.sample_remaining_columns(df_synth[['age', 'education']])
+    df_synth_remaining = pbfix.sample_remaining_columns(df_synth['age'])
 
 
     """test scoring functions"""
