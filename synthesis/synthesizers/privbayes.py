@@ -13,7 +13,7 @@ from sklearn.metrics import mutual_info_score
 from collections import namedtuple
 
 import synthesis.synthesizers.utils as utils
-from synthesis.synthesizers._base import BaseDPSynthesizer, FixedSamplingMixin
+from synthesis.synthesizers._base import BaseDPSynthesizer
 from thomas.core import BayesianNetwork
 from diffprivlib.mechanisms import Exponential
 

@@ -3,6 +3,7 @@
 
 import numpy as np
 import pandas as pd
+import pandas_flavor as pf
 import warnings
 from collections import defaultdict
 
@@ -14,6 +15,78 @@ from synthesis.transformers._base import BaseReversibleTransformer
 from synthesis.synthesizers.utils import dp_marginal_distribution, _normalize_distribution
 from synthesis.evaluation import visual
 
+@pf.register_dataframe_method
+def bin_numeric_column(df: pd.DataFrame, column_name: str, n_bins: int, strategy: str = 'uniform'):
+    """Bin a numeric column according to the number of bins. Can either use staregy 'uniform'
+    for obtaining equal-width bins, or strategy 'quanitle' for bins with equal number of
+    observations
+
+    Preserves NaN values. Inspired by sklearn KBinsDiscretizer"""
+
+
+    if strategy not in ['uniform', 'quantile']:
+        raise ValueError("Strategy must either be 'uniform' or 'quantile'")
+
+    df = df.copy()
+
+    # exclude nan values
+    mask_missing = df[column_name].isna()
+    column = df.loc[~mask_missing, column_name][~mask_missing]
+
+    # create equal-width bins
+    if strategy == 'uniform':
+        col_min, col_max = column.min(), column.max()
+        bin_edges = np.linspace(col_min, col_max, n_bins + 1)
+
+    # create bins with equal number of observations
+    elif strategy == 'quantile':
+        quantiles = np.linspace(0, 100, n_bins + 1)
+        bin_edges = np.asarray(np.percentile(column.values, quantiles))
+
+        # remove bins with too small width
+        mask = np.ediff1d(bin_edges, to_begin=np.inf) > 1e-8
+        bin_edges = bin_edges[mask]
+        if len(bin_edges) - 1 != n_bins:
+            warnings.warn('Bins whose width are too small (i.e., <= '
+                          '1e-8). Consider decreasing the number of bins.')
+            n_bins = len(bin_edges) - 1
+
+    # Values which are close to a bin edge are susceptible to numeric instability
+    # Add eps to X so these values are binned correctly with respect to their decimal truncation
+    # eps = 1.e-8 + 1.e-5 * np.abs(column)
+    # column = np.digitize(column + eps, bin_edges[1:])
+    column = np.digitize(column, bin_edges[1:])
+
+    column = np.clip(column, 0, n_bins - 1)
+
+    # round to 2 decimals to prevent long numbers
+    lower_bound = np.round(bin_edges[np.int_(column)], 2)
+    upper_bound = np.round(bin_edges[np.int_(column) + 1], 2)
+
+    # transform column to IntervalArray
+    df.loc[~mask_missing, column_name] = pd.arrays.IntervalArray.from_arrays(lower_bound, upper_bound, closed='left')
+    return df
+
+@pf.register_dataframe_method
+def sample_from_binned_column(df: pd.DataFrame, column_name:str, numeric_type='int'):
+    """Reverse the binning of a numeric column, by sampling from the bin ranges"""
+    if numeric_type not in ['int', 'float']:
+        raise ValueError("Numeric type must be 'int' or 'float'")
+    df = df.copy()
+    mask_missing = df[column_name].isna()
+
+    try:
+        column = pd.arrays.IntervalArray(df[column_name][~mask_missing])
+    except TypeError:
+        raise ValueError("Numeric column needs to be converted to bins first. "
+                         "First run .bin_numeric_column on a continuous column")
+
+    lower_bound, upper_bound = column.left, column.right
+    if numeric_type == 'int':
+        df.loc[~mask_missing, column_name] = np.random.randint(lower_bound, upper_bound)
+    elif numeric_type == 'float':
+        df.loc[~mask_missing, column_name] = np.random.uniform(lower_bound, upper_bound)
+    return df
 
 
 class GeneralizeContinuous(KBinsDiscretizer):

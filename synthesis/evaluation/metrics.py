@@ -50,7 +50,7 @@ class MarginalComparison(BaseMetric):
             bar_width = 0.35
 
             # with small column cardinality plot original distribution as bars, else plot as line
-            if len(column_value_counts_original.values) <= 20:
+            if len(column_value_counts_original.values) <= 25:
                 ax[idx].bar(x=bar_position, height=column_value_counts_original.values,
                             color=COLOR_PALETTE[0], label=self.labels[0], width=bar_width)
             else:
@@ -62,7 +62,7 @@ class MarginalComparison(BaseMetric):
                         color=COLOR_PALETTE[1], label=self.labels[1], width=bar_width)
 
             ax[idx].set_xticks(bar_position + bar_width / 2)
-            if len(column_value_counts_original.values) <= 20:
+            if len(column_value_counts_original.values) <= 25:
                 ax[idx].set_xticklabels(column_value_counts_original.keys(), rotation=25)
             else:
                 ax[idx].set_xticklabels('')
