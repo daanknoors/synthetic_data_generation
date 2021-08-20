@@ -81,17 +81,17 @@ class MarginalComparison(BaseMetric):
 
 class AssociationsComparison(BaseMetric):
 
-    def __init__(self, theil_u=True, nominal_columns='auto', labels=None):
+    def __init__(self, nom_nom_assoc='theil', nominal_columns='auto', labels=None):
         super().__init__(labels=labels)
-        self.theil_u = theil_u
+        self.nom_nom_assoc = nom_nom_assoc
         self.nominal_columns = nominal_columns
 
     def fit(self, data_original, data_synthetic):
         data_original, data_synthetic = self._check_input_data(data_original, data_synthetic)
 
-        self.stats_original_ = compute_associations(data_original, nom_nom_assoc='theil',
+        self.stats_original_ = compute_associations(data_original, nom_nom_assoc=self.nom_nom_assoc,
                                                      nominal_columns=self.nominal_columns, nan_replace_value='nan')
-        self.stats_synthetic_ = compute_associations(data_synthetic, nom_nom_assoc='theil',
+        self.stats_synthetic_ = compute_associations(data_synthetic, nom_nom_assoc=self.nom_nom_assoc,
                                                      nominal_columns=self.nominal_columns, nan_replace_value='nan')
         return self
 
