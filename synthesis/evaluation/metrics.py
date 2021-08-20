@@ -89,9 +89,9 @@ class AssociationsComparison(BaseMetric):
     def fit(self, data_original, data_synthetic):
         data_original, data_synthetic = self._check_input_data(data_original, data_synthetic)
 
-        self.stats_original_ = compute_associations(data_original, theil_u=self.theil_u,
+        self.stats_original_ = compute_associations(data_original, nom_nom_assoc='theil',
                                                      nominal_columns=self.nominal_columns, nan_replace_value='nan')
-        self.stats_synthetic_ = compute_associations(data_synthetic, theil_u=self.theil_u,
+        self.stats_synthetic_ = compute_associations(data_synthetic, nom_nom_assoc='theil',
                                                      nominal_columns=self.nominal_columns, nan_replace_value='nan')
         return self
 
