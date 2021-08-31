@@ -65,10 +65,12 @@ def bin_numeric_column(df: pd.DataFrame, column_name: str, n_bins: int, strategy
 
     # transform column to IntervalArray
     df.loc[~mask_missing, column_name] = pd.arrays.IntervalArray.from_arrays(lower_bound, upper_bound, closed='left')
+    # force Interval dtype for whole column
+    df[column_name] = pd.arrays.IntervalArray(df[column_name])
     return df
 
 @pf.register_dataframe_method
-def sample_from_binned_column(df: pd.DataFrame, column_name:str, numeric_type='int'):
+def sample_from_binned_column(df: pd.DataFrame, column_name: str, numeric_type='int'):
     """Reverse the binning of a numeric column, by sampling from the bin ranges"""
     if numeric_type not in ['int', 'float']:
         raise ValueError("Numeric type must be 'int' or 'float'")

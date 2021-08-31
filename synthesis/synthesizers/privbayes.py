@@ -159,7 +159,7 @@ class PrivBayes(BaseDPSynthesizer):
             # print("Pre-defined network init: {}".format(self.network_))
             for i, pair in enumerate(self.network_init):
                 if self.verbose:
-                    print("{}/{} - init node {} - with parents: {}".format(i + 1, len(self.network_init),
+                    print("{}/{} - init node {} - with parents: {}".format(i + 1, len(nodes),
                                                                            pair.node, pair.parents))
             self.network_ = self.network_init.copy()
             return nodes, nodes_selected

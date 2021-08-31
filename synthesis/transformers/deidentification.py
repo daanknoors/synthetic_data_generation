@@ -26,10 +26,10 @@ def group_rare_values(df: pd.DataFrame, column_names=None, threshold=0.05, rare_
     return df
 
 @pf.register_dataframe_method
-def add_fake_identifiers(df, new_colummn_name='id',  id_string='FAKE_PERSON_'):
+def add_fake_identifiers(df, colummn_name='id',  id_string='FAKE_PERSON_'):
     """Add column with fake identifiers"""
     df = df.copy()
-    df[new_colummn_name] = [id_string + str(i) for i in np.arange(0, df.shape[0])]
+    df[colummn_name] = [id_string + str(i) for i in np.arange(0, df.shape[0])]
     return df
 
 
