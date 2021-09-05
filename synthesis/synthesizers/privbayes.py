@@ -393,6 +393,26 @@ class PrivBayesFix(PrivBayes):
         data = data.astype(str)
         return data
 
+class PrivBayesNP(PrivBayes):
+    """Privbayes class with infinite-differential privacy, while still using epsilon value to limit the size of the network
+    """
+
+    def __init__(self, epsilon=1, theta_usefulness=4, epsilon_split=0.3,
+                 score_function='R', network_init=None, verbose=True):
+        self.epsilon1 = float(np.inf)
+        self.epsilon2 = epsilon
+        super().__init__(epsilon=self.epsilon1, theta_usefulness=theta_usefulness, epsilon_split=epsilon_split,
+                         score_function=score_function, network_init=network_init, verbose=verbose)
+
+
+    def _max_domain_size(self, data, node):
+        """Computes the maximum domain size a node can have to satisfy theta-usefulness"""
+        node_cardinality = utils.cardinality(data[node])
+        max_domain_size = self.n_records_fit_ * self.epsilon2 / \
+                          (2 * len(self.columns_) * self.theta_usefulness * node_cardinality)
+        return max_domain_size
+
+
 if __name__ == "__main__":
     data_path = '../../examples/data/original/adult.csv'
     data = pd.read_csv(data_path, engine='python')
