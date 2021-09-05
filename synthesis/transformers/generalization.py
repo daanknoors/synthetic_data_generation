@@ -16,13 +16,14 @@ from synthesis.synthesizers.utils import dp_marginal_distribution, _normalize_di
 from synthesis.evaluation import visual
 
 @pf.register_dataframe_method
-def bin_numeric_column(df: pd.DataFrame, column_name: str, n_bins: int, strategy: str = 'uniform'):
+def bin_numeric_column(df: pd.DataFrame, column_name: str, n_bins: int, col_min: int, col_max: int, strategy: str = 'uniform'):
     """Bin a numeric column according to the number of bins. Can either use staregy 'uniform'
     for obtaining equal-width bins, or strategy 'quanitle' for bins with equal number of
     observations
 
-    Preserves NaN values. Inspired by sklearn KBinsDiscretizer"""
+    Preserves NaN values. Inspired by sklearn KBinsDiscretizer
 
+    Manually add column min and max. As inference from the data can reveal individual values."""
 
     if strategy not in ['uniform', 'quantile']:
         raise ValueError("Strategy must either be 'uniform' or 'quantile'")
@@ -35,13 +36,13 @@ def bin_numeric_column(df: pd.DataFrame, column_name: str, n_bins: int, strategy
 
     # create equal-width bins
     if strategy == 'uniform':
-        col_min, col_max = column.min(), column.max()
         bin_edges = np.linspace(col_min, col_max, n_bins + 1)
 
     # create bins with equal number of observations
     elif strategy == 'quantile':
         quantiles = np.linspace(0, 100, n_bins + 1)
-        bin_edges = np.asarray(np.percentile(column.values, quantiles))
+        column_values = np.append(column.values, [col_min, col_max])
+        bin_edges = np.asarray(np.percentile(column_values, quantiles))
 
         # remove bins with too small width
         mask = np.ediff1d(bin_edges, to_begin=np.inf) > 1e-8
@@ -90,6 +91,34 @@ def sample_from_binned_column(df: pd.DataFrame, column_name: str, numeric_type='
         df.loc[~mask_missing, column_name] = np.random.uniform(lower_bound, upper_bound)
     return df
 
+def sample_from_reversed_dict(df: pd.DataFrame, **generalize_dict):
+    """reverse generalization schema and sample unique values.
+    dict structure: {column_name: {value: generalized_value}}"""
+    for column_name, mapper in generalize_dict.items():
+        df = _sample_from_reversed_dict(df, column_name, mapper)
+    return df
+
+def _sample_from_reversed_dict(df: pd.DataFrame, column_name, mapper):
+
+    df = df.copy()
+
+    # reverse schema
+    reversed_dict = defaultdict(list)
+    for key, value in mapper.items():
+        reversed_dict[value].append(key)
+
+    # sample from values
+    column_generalized = df[column_name].values
+    column_sampled = np.empty_like(column_generalized)
+    for i in range(len(column_sampled)):
+        reverse_candidates = reversed_dict[column_generalized[i]]
+
+        if reverse_candidates:
+            column_sampled[i] = np.random.choice(reverse_candidates)
+        else:
+            column_sampled[i] = column_generalized[i]
+    df[column_name] = column_sampled
+    return df
 
 class GeneralizeContinuous(KBinsDiscretizer):
 
@@ -361,7 +390,7 @@ def get_high_cardinality_features(X, threshold=50):
 
 
 class GeneralizeSchematic(TransformerMixin, BaseEstimator):
-    
+
     def __init__(self, schema_dict, label_unknown=None):
         self.schema_dict = schema_dict
         self.label_unknown = label_unknown
@@ -376,7 +405,7 @@ class GeneralizeSchematic(TransformerMixin, BaseEstimator):
         # convert categories not present in schema to value given for label_unknown
         if self.label_unknown:
             Xt[~Xt.isin(self.schema_dict.keys())] = self.label_unknown
-        
+
         return Xt.replace(self.schema_dict)
 
     def _reverse_schema(self):
