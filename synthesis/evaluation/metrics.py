@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from scipy.spatial.distance import jensenshannon
-from dython.nominal import compute_associations
+from dython.nominal import associations
 
 from synthesis.evaluation._base import BaseMetric, COLOR_PALETTE
 
@@ -89,10 +89,12 @@ class AssociationsComparison(BaseMetric):
     def fit(self, data_original, data_synthetic):
         data_original, data_synthetic = self._check_input_data(data_original, data_synthetic)
 
-        self.stats_original_ = compute_associations(data_original, nom_nom_assoc=self.nom_nom_assoc,
-                                                     nominal_columns=self.nominal_columns, nan_replace_value='nan')
-        self.stats_synthetic_ = compute_associations(data_synthetic, nom_nom_assoc=self.nom_nom_assoc,
-                                                     nominal_columns=self.nominal_columns, nan_replace_value='nan')
+        self.stats_original_ = associations(data_original, nom_nom_assoc=self.nom_nom_assoc,
+                                            nominal_columns=self.nominal_columns, nan_replace_value='nan',
+                                            compute_only=True)['corr']
+        self.stats_synthetic_ = associations(data_synthetic, nom_nom_assoc=self.nom_nom_assoc,
+                                             nominal_columns=self.nominal_columns, nan_replace_value='nan',
+                                             compute_only=True)['corr']
         return self
 
     def score(self):

@@ -234,7 +234,7 @@ graph = ["objgraph (>=1.7.2)"]
 
 [[package]]
 name = "dython"
-version = "0.6.7"
+version = "0.6.7.post2"
 description = "A set of data tools in Python"
 category = "main"
 optional = false
@@ -1671,8 +1671,8 @@ dill = [
     {file = "dill-0.3.4.zip", hash = "sha256:9f9734205146b2b353ab3fec9af0070237b6ddae78452af83d2fca84d739e675"},
 ]
 dython = [
-    {file = "dython-0.6.7-py3-none-any.whl", hash = "sha256:dd01e04327277cad00bbb5436e18b23efa2d9216d0fd916371be017c2af17ae3"},
-    {file = "dython-0.6.7.tar.gz", hash = "sha256:a152c871ffdcacf31f1e135dff0423de3533ad09287baacf4b6d6657aefbd0c2"},
+    {file = "dython-0.6.7.post2-py3-none-any.whl", hash = "sha256:db465bbf5a2f677ecc6a0465913e09ee25d27940c419fe8936972af7007255f2"},
+    {file = "dython-0.6.7.post2.tar.gz", hash = "sha256:9bb87481236ad6141e42e9ae353aeac94bcce70fedf8ec2e161d937eed67c2f0"},
 ]
 entrypoints = [
     {file = "entrypoints-0.3-py2.py3-none-any.whl", hash = "sha256:589f874b313739ad35be6e0cd7efde2a4e9b6fea91edcc34e58ecbb8dbe56d19"},
