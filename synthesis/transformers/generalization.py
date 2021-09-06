@@ -91,6 +91,7 @@ def sample_from_binned_column(df: pd.DataFrame, column_name: str, numeric_type='
         df.loc[~mask_missing, column_name] = np.random.uniform(lower_bound, upper_bound)
     return df
 
+@pf.register_dataframe_method
 def sample_from_reversed_dict(df: pd.DataFrame, **generalize_dict):
     """reverse generalization schema and sample unique values.
     dict structure: {column_name: {value: generalized_value}}"""
