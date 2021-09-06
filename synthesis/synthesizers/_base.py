@@ -145,14 +145,16 @@ class BaseDPSynthesizer(ABC):
         self.dtypes_fit_ = data.dtypes
 
         # converts to dataframe in case of numpy input and make all columns categorical.
-        data = pd.DataFrame(data).astype(str, copy=False)
+        data = pd.DataFrame(data).astype('category', copy=False)
         return data
 
     def _check_output_data(self, data_synth):
         """Check if output is in same format input data."""
+        # DEPRCATED: bool conversion no longer special case as we change input_data.astype(str) to input_data.astype(category)
         # convert dtypes back to original - first convert object to bool to prevent all values from becoming True
-        bool_cols = self.dtypes_fit_[self.dtypes_fit_ == bool].index
-        data_synth[bool_cols] = data_synth[bool_cols].replace({'False': False, 'True': True})
+        # bool_cols = self.dtypes_fit_[self.dtypes_fit_ == bool].index
+
+        # data_synth[bool_cols] = data_synth[bool_cols].replace({'False': False, 'True': True})
         data_synth = data_synth.astype(self.dtypes_fit_)
 
         # convert 'nan' to NaN
