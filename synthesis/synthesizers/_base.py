@@ -146,6 +146,11 @@ class BaseDPSynthesizer(ABC):
 
         # converts to dataframe in case of numpy input and make all columns categorical.
         data = pd.DataFrame(data).astype('category', copy=False)
+
+        # add nan as category
+        nan_columns = data.columns[data.isna().any()]
+        for c in nan_columns:
+            data[c] = data[c].cat.add_categories('nan').fillna('nan')
         return data
 
     def _check_output_data(self, data_synth):
