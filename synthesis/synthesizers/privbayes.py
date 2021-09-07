@@ -9,8 +9,11 @@ PrivBayes: Private Data Release via Bayesian Networks. (2017)
 
 import numpy as np
 import pandas as pd
+import random
 from sklearn.metrics import mutual_info_score
 from collections import namedtuple
+from joblib import Parallel, delayed
+
 
 import synthesis.synthesizers.utils as utils
 from synthesis.synthesizers._base import BaseDPSynthesizer
@@ -34,12 +37,13 @@ class PrivBayes(BaseDPSynthesizer):
     """
 
     def __init__(self, epsilon=1.0, theta_usefulness=4, epsilon_split=0.3,
-                 score_function='R', network_init=None, verbose=True):
+                 score_function='R', network_init=None, n_cpus=None, verbose=True):
         super().__init__(epsilon=epsilon, verbose=verbose)
         self.theta_usefulness = theta_usefulness
         self.epsilon_split = epsilon_split  # also called Beta in paper
         self.score_function = score_function  # choose between 'R' and 'MI'
         self.network_init = network_init
+        self.n_cpus = n_cpus
 
     def fit(self, data):
         data = self._check_input_data(data)
@@ -100,7 +104,7 @@ class PrivBayes(BaseDPSynthesizer):
                 # empty set - domain size of node violates theta_usefulness
                 if len(max_parent_sets) == 0:
                     ap_pairs.append(APPair(node, parents=None))
-                # [empty set] - no parents found that meet domain size restrictions
+                # [empty set] - no parents found that meets domain size restrictions
                 elif len(max_parent_sets) == 1 and len(max_parent_sets[0]) == 0:
                     ap_pairs.append(APPair(node, parents=None))
                 else:
@@ -182,16 +186,24 @@ class PrivBayes(BaseDPSynthesizer):
 
     def _compute_scores(self, data, ap_pairs):
         """Compute score for all ap_pairs"""
-        scores = np.empty(len(ap_pairs))
-
-        for idx, pair in enumerate(ap_pairs):
-            if pair.parents is None:
-                scores[idx] = 0
-            elif self.score_function == 'R':
-                scores[idx] = self.r_score(data, pair.node, pair.parents)
-            elif self.score_function == 'MI':
-                scores[idx] = self.mi_score(data, pair.node, pair.parents)
+        if self.n_cpus:
+            scores = Parallel(n_jobs=self.n_cpus)(delayed(self.r_score)(data, pair.node, pair.parents) for pair in ap_pairs)
+        else:
+            scores = [self.r_score(data, pair.node, pair.parents) for pair in ap_pairs]
         return scores
+
+    # def _compute_scores(self, data, ap_pairs):
+    #     """Compute score for all ap_pairs"""
+    #     scores = np.empty(len(ap_pairs))
+    #
+    #     for idx, pair in enumerate(ap_pairs):
+    #         if pair.parents is None:
+    #             scores[idx] = 0
+    #         elif self.score_function == 'R':
+    #                 scores[idx] = self.r_score(data, pair.node, pair.parents)
+    #         elif self.score_function == 'MI':
+    #             scores[idx] = self.mi_score(data, pair.node, pair.parents)
+    #     return scores
 
     def _exponential_mechanism(self, ap_pairs, scores):
         """select APPair with exponential mechanism"""
@@ -246,9 +258,11 @@ class PrivBayes(BaseDPSynthesizer):
             if node.conditioning:
                 parent_values = [record[p] for p in node.conditioning]
                 node_probs = node_cpt[tuple(parent_values)]
+
             else:
                 node_probs = node_cpt.values
-            sampled_node_value = np.random.choice(node_states, p=node_probs)
+            # use random.choices over np.random.choice as np coerces, e.g. sample['nan', 1, 3.0] -> '1' (int to string)
+            sampled_node_value = random.choices(node_states, weights=node_probs, k=1)[0] # returns list
 
             record[node.name] = sampled_node_value
         return record
@@ -293,6 +307,8 @@ class PrivBayes(BaseDPSynthesizer):
         Relies on the L1 distance from a joint distribution to a joint distributions that minimizes mutual information.
         Refer to Lemma 5.2
         """
+        if columns_b is None:
+            return 0
         columns_a = utils._ensure_arg_is_list(columns_a)
         columns_b = utils._ensure_arg_is_list(columns_b)
 
@@ -317,9 +333,9 @@ class PrivBayesFix(PrivBayes):
     """
 
     def __init__(self, epsilon=1.0, theta_usefulness=4, epsilon_split=0.3,
-                 score_function='R', network_init=None, verbose=True):
+                 score_function='R', network_init=None, n_cpus=None, verbose=True):
         super().__init__(epsilon=epsilon, theta_usefulness=theta_usefulness, epsilon_split=epsilon_split,
-                         score_function=score_function, network_init=network_init, verbose=verbose)
+                         score_function=score_function, network_init=network_init, n_cpus=n_cpus, verbose=verbose)
 
     def fit(self, data):
         super().fit(data)
@@ -370,7 +386,8 @@ class PrivBayesFix(PrivBayes):
                 node_probs = node_cpt[tuple(parent_values)]
             else:
                 node_probs = node_cpt.values
-            sampled_node_value = np.random.choice(node_states, p=node_probs)
+            # sampled_node_value = np.random.choice(node_states, p=node_probs)
+            sampled_node_value = random.choices(node_states, weights=node_probs)
             record[node.name] = sampled_node_value
         return record
 
@@ -390,7 +407,7 @@ class PrivBayesFix(PrivBayes):
         # prevent integer column indexing issues
         data.columns = data.columns.astype(str)
         # make all columns categorical.
-        data = data.astype(str)
+        data = data.astype('category')
         return data
 
 class PrivBayesNP(PrivBayes):
@@ -398,11 +415,11 @@ class PrivBayesNP(PrivBayes):
     """
 
     def __init__(self, epsilon=1, theta_usefulness=4, epsilon_split=0.3,
-                 score_function='R', network_init=None, verbose=True):
+                 score_function='R', network_init=None, n_cpus=None, verbose=True):
         self.epsilon1 = float(np.inf)
         self.epsilon2 = epsilon
         super().__init__(epsilon=self.epsilon1, theta_usefulness=theta_usefulness, epsilon_split=epsilon_split,
-                         score_function=score_function, network_init=network_init, verbose=verbose)
+                         score_function=score_function, network_init=network_init, n_cpus=n_cpus, verbose=verbose)
 
 
     def _max_domain_size(self, data, node):
@@ -416,11 +433,11 @@ class PrivBayesNP(PrivBayes):
 if __name__ == "__main__":
     data_path = '../../examples/data/original/adult.csv'
     data = pd.read_csv(data_path, engine='python')
-    columns = ['age', 'sex', 'education', 'workclass', 'income']
-    data = data.loc[:, columns]
+    # columns = ['age', 'sex', 'education', 'workclass', 'income']
+    # data = data.loc[:, columns]
     print(data.head())
 
-    pb = PrivBayes(epsilon=0.1)
+    pb = PrivBayes(epsilon=1, n_cpus=4)
     pb.fit(data)
     df_synth = pb.sample(1000)
     pb.score(data, df_synth, score_dict=True)
@@ -436,7 +453,7 @@ if __name__ == "__main__":
     # df_synth_init = pbinit.sample(1000)
 
     # fixing a network - specify init network to fix those variables when generating
-    pbfix = PrivBayesFix(epsilon=1)
+    pbfix = PrivBayesFix(epsilon=1, n_cpus=4)
     init_network = [APPair('age', None), APPair('education', ('age',))]
     # init_network = [APPair(node='age', parents=None),
     #                 APPair(node='education', parents=('age',)),
@@ -453,3 +470,4 @@ if __name__ == "__main__":
     pb.mi_score(data, pair.node, pair.parents)
     pb.mi_score_thomas(data, pair.node, pair.parents)
     pb.r_score(data, pair.node, pair.parents)
+
