@@ -68,7 +68,7 @@ class MarginalComparison(BaseMetric):
                 ax[idx].set_xticklabels('')
             # ax[idx].set_title('Column: ' +  r"$\bf{" + col + "}$" +
             #                   ' ~ jensen-shannon distance: ' + '{:.2f}'.format(self.stats_[col]))
-            title = r"$\bf{" + col + "}$" + "\n jensen-shannon distance: {:.2f}".format(self.stats_[col])
+            title = r"$\bf{" + col.replace('_', '\_') + "}$" + "\n jensen-shannon distance: {:.2f}".format(self.stats_[col])
             ax[idx].set_title(title)
             if self.normalize:
                 ax[idx].set_ylabel('Probability')
