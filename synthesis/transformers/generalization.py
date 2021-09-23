@@ -3,6 +3,7 @@
 
 import numpy as np
 import pandas as pd
+import random
 import pandas_flavor as pf
 import warnings
 from collections import defaultdict
@@ -115,10 +116,20 @@ def _sample_from_reversed_dict(df: pd.DataFrame, column_name, mapper):
         reverse_candidates = reversed_dict[column_generalized[i]]
 
         if reverse_candidates:
-            column_sampled[i] = np.random.choice(reverse_candidates)
+            column_sampled[i] = random.choice(reverse_candidates)
         else:
             column_sampled[i] = column_generalized[i]
     df[column_name] = column_sampled
+
+    # convert string 'nan' to NaN which automatically converts column to float if all other elements are numeric
+    df[column_name] = df[column_name].replace({'nan': np.nan})
+    return df
+
+@pf.register_dataframe_method
+def combine_rare_categories(df, column, min_freq=0.01, new_name='other'):
+    """Combine categories in column that occur less than minimum frequency threshold"""
+    maks_low_value_counts = df[column].value_counts(normalize=True) < min_freq
+    df[column] = df[column].mask(df[column].map(maks_low_value_counts, new_name))
     return df
 
 class GeneralizeContinuous(KBinsDiscretizer):
