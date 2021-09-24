@@ -126,10 +126,14 @@ def _sample_from_reversed_dict(df: pd.DataFrame, column_name, mapper):
     return df
 
 @pf.register_dataframe_method
-def combine_rare_categories(df, column, min_freq=0.01, new_name='other'):
-    """Combine categories in column that occur less than minimum frequency threshold"""
-    maks_low_value_counts = df[column].value_counts(normalize=True) < min_freq
-    df[column] = df[column].mask(df[column].map(maks_low_value_counts, new_name))
+def replace_rare_values(df, column, min_support=0.01, new_name='other'):
+    """Replace values that occur less than minimum support with new name"""
+    df = df.copy()
+    print(f'Category in column {column} that occur less than {np.ceil(min_support*df.shape[0])}x '
+          f'are converted to {new_name}')
+    map_value_probs_to_rows = df[column].map(df[column].value_counts(normalize=True))
+    convert_low_freq_rows = df[column].mask(map_value_probs_to_rows <= min_support, new_name)
+    df[column] = convert_low_freq_rows
     return df
 
 class GeneralizeContinuous(KBinsDiscretizer):
