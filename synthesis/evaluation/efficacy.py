@@ -8,9 +8,11 @@ from lifelines import KaplanMeierFitter
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
 from sklearn.model_selection import GridSearchCV
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import roc_auc_score, plot_roc_curve
+from sklearn.base import BaseEstimator, TransformerMixin
 
 from synthesis.evaluation._base import BaseMetric, BasePredictiveMetric, COLOR_PALETTE
 
@@ -68,6 +70,19 @@ class KaplanMeierComparison(BaseMetric):
                 ax_cur.set_ylim(0, 1)
         plt.tight_layout()
 
+
+class EnsureConsistentType(BaseEstimator, TransformerMixin):
+    """Ensure consistent type in dataset - used to avoid issues with mixed types in columns"""
+    def __init__(self, dtype=str):
+        self.dtype=dtype
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        return X.astype(self.dtype)
+
+
 class TrainBothTestOriginalHoldout(BasePredictiveMetric):
 
     def __init__(self, y_column=None, random_state=None, n_jobs=None, labels=None):
@@ -90,9 +105,22 @@ class TrainBothTestOriginalHoldout(BasePredictiveMetric):
         categorical_features = X.select_dtypes(include=['object']).columns
         numeric_features = [feat for feat in X.columns if not feat in categorical_features]
 
+        preprocessor_num = Pipeline(steps=[
+            ('simple_imputer_num', SimpleImputer(strategy='median')),
+            ('num_scaling', MinMaxScaler()),
+        ])
+
+        preprocessor_cat = Pipeline(steps=[
+            ('simple_imputer_cat', SimpleImputer(strategy='most_frequent')),
+            ('ensure_consistent_dtype', EnsureConsistentType(dtype=str)),  # avoid mixed type columns
+            ('categorical_encoding', OneHotEncoder(handle_unknown='ignore'))
+        ])
+
         preprocessor = ColumnTransformer(transformers=[
-            ('num_scaling', MinMaxScaler(), numeric_features),
-            ('categorical_encoding', OneHotEncoder(handle_unknown='ignore'), categorical_features)])
+            ('num', preprocessor_num, numeric_features),
+            ('cat', preprocessor_cat, categorical_features)
+        ])
+
 
         # Classifier
         clf_rf = RandomForestClassifier(class_weight='balanced', min_samples_leaf=0.05, random_state=self.random_state)
@@ -122,7 +150,7 @@ class TrainBothTestOriginalHoldout(BasePredictiveMetric):
         return scores
 
     def plot(self, data_original_test):
-        """"Could plot ROC-AOC Curves of both original and synthetic in single figure"""
+        """"Plot ROC-AOC Curves of both original and synthetic in single figure"""
         X_test, y_test = self._split_xy(data_original_test)
 
         fig, ax = plt.subplots()
