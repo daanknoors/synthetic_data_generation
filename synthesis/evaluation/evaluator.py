@@ -38,8 +38,8 @@ class SyntheticDataEvaluator(BaseMetric):
         return scores
 
     def plot(self):
-        for name, metrics in self.metrics.items():
-            metrics.plot()
+        for name, metric in self.metrics.items():
+            metric.plot()
 
     def _check_input_args(self):
         if self.metrics is not None:
@@ -105,17 +105,3 @@ class OriginalDataEvaluator():
             rare_categories[c] = [k for k, v in data[c].value_counts(normalize=True).items() if v < threshold]
         return rare_categories
 
-
-
-if __name__ == '__main__':
-    path = Path('C:\\projects\\synthetic_data_generation\\examples\\data')
-    columns = ['age', 'workclass', 'education', 'relationship', 'occupation', 'income']
-    df = pd.read_csv(path / 'original/adult.csv')[columns]
-    df_ms = pd.read_csv(path / 'synthetic/adult_ms_1eps.csv')[columns]
-    df_pb = pd.read_csv(path / 'synthetic/adult_pb_1eps.csv')[columns]
-
-
-    se = SyntheticEvaluator()
-    se.fit(df, df_pb)
-    se.score()
-    se.plot()
