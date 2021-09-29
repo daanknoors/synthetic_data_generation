@@ -129,10 +129,27 @@ def _sample_from_reversed_dict(df: pd.DataFrame, column_name, mapper):
 def replace_rare_values(df, column, min_support=0.01, new_name='other'):
     """Replace values that occur less than minimum support with new name"""
     df = df.copy()
-    print(f'Category in column {column} that occur less than {np.ceil(min_support*df.shape[0])}x '
-          f'are converted to {new_name}')
-    map_value_probs_to_rows = df[column].map(df[column].value_counts(normalize=True))
-    convert_low_freq_rows = df[column].mask(map_value_probs_to_rows <= min_support, new_name)
+
+    # normalize if floating number, use counts if int
+    if isinstance(min_support, float):
+        normalize = True
+        n_records_support = np.ceil(min_support * df.shape[0])
+    else:
+        normalize = False
+        n_records_support = min_support
+
+    column_value_counts = df[column].value_counts(normalize=normalize)
+
+    # if no rare categories under min support - no change required
+    if not (column_value_counts < min_support).any():
+        return df
+
+    rare_categories = list(column_value_counts[column_value_counts < min_support].index)
+    print(f"Categories {rare_categories} in column '{column}' occur less than {n_records_support}x "
+          f"and are converted to {new_name}")
+
+    map_value_probs_to_rows = df[column].map(column_value_counts)
+    convert_low_freq_rows = df[column].mask(map_value_probs_to_rows < min_support, new_name)
     df[column] = convert_low_freq_rows
     return df
 
