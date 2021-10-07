@@ -10,6 +10,7 @@ PrivBayes: Private Data Release via Bayesian Networks. (2017)
 import numpy as np
 import pandas as pd
 import random
+import dill
 from sklearn.metrics import mutual_info_score
 from collections import namedtuple
 from joblib import Parallel, delayed
@@ -325,6 +326,45 @@ class PrivBayes(BaseDPSynthesizer):
         prob_joint, prob_independent = prob_joint.extend_and_reorder(prob_joint, prob_independent)
         l1_distance = 0.5 * np.sum(np.abs(prob_joint.values - prob_independent.values))
         return l1_distance
+
+    def save(self, path):
+        """
+        Save this synthesizer instance to the given path using pickle.
+
+        Parameters
+        ----------
+        path: str
+            Path where the synthesizer instance is saved.
+        """
+        # todo issue can't save if model is fitted - likely error within thomas
+        if hasattr(self, 'model_'):
+            pb = self.copy()
+            del pb.model_
+
+        with open(path, 'wb') as output:
+            dill.dump(pb, output)
+
+    @classmethod
+    def load(cls, path):
+        """Load a synthesizer instance from specified path.
+        Parameters
+        ----------
+        path: str
+            Path where the synthesizer instance is saved.
+
+        Returns
+        -------
+        synthesizer : class
+            Returns synthesizer instance.
+        """
+        with open(path, 'rb') as f:
+            pb = dill.load(f)
+
+        # recreate model_ attribute based on fitted network and cpt's
+        if hasattr(pb, 'cpt_'):
+            pb.model_ = BayesianNetwork.from_CPTs('PrivBayes', pb.cpt_.values())
+        return pb
+
 
 
 class PrivBayesFix(PrivBayes):
