@@ -9,6 +9,8 @@ from copy import copy
 from numbers import Real
 from scipy.spatial.distance import jensenshannon
 
+from synthesis.synthesizers.utils import astype_categorical
+
 class BaseDPSynthesizer(ABC):
     """Abstract base class for all differentially private synthesizers"""
 
@@ -144,13 +146,8 @@ class BaseDPSynthesizer(ABC):
         self.n_records_fit_ = data.shape[0]
         self.dtypes_fit_ = data.dtypes
 
-        # converts to dataframe in case of numpy input and make all columns categorical.
-        data = pd.DataFrame(data).astype('category', copy=False)
-
-        # add nan as category
-        nan_columns = data.columns[data.isna().any()]
-        for c in nan_columns:
-            data[c] = data[c].cat.add_categories('nan').fillna('nan')
+        # converts dataframe to categorical, include 'nan' as category
+        data = astype_categorical(data, include_nan=True)
         return data
 
     def _check_output_data(self, data_synth):

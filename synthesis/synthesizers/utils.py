@@ -157,3 +157,15 @@ def cardinality(X):
 def rank_columns_on_cardinality(X):
     """Rank columns based on number of unique values"""
     return X.nunique().sort_values(ascending=False)
+
+def astype_categorical(data, include_nan=True):
+    """Convert data to categorical and optionally adds nan as unique category"""
+    # converts to dataframe in case of numpy input and make all columns categorical.
+    data = pd.DataFrame(data).astype('category', copy=False)
+
+    # add nan as category
+    if include_nan:
+        nan_columns = data.columns[data.isna().any()]
+        for c in nan_columns:
+            data[c] = data[c].cat.add_categories('nan').fillna('nan')
+    return data

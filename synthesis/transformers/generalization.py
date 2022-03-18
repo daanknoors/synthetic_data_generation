@@ -7,6 +7,7 @@ import random
 import pandas_flavor as pf
 import warnings
 from collections import defaultdict
+from scipy.stats import truncnorm
 
 from sklearn.utils.validation import check_array, FLOAT_DTYPES
 from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
@@ -56,7 +57,7 @@ def bin_numeric_column(df: pd.DataFrame, column_name: str, n_bins: int, col_min:
     # Values which are close to a bin edge are susceptible to numeric instability
     # Add eps to X so these values are binned correctly with respect to their decimal truncation
     # eps = 1.e-8 + 1.e-5 * np.abs(column)
-    # column = np.digitize(column + eps, bin_edges[1:])
+    # column_name = np.digitize(column_name + eps, bin_edges[1:])
     column = np.digitize(column, bin_edges[1:])
 
     column = np.clip(column, 0, n_bins - 1)
@@ -67,13 +68,15 @@ def bin_numeric_column(df: pd.DataFrame, column_name: str, n_bins: int, col_min:
 
     # transform column to IntervalArray
     df.loc[~mask_missing, column_name] = pd.arrays.IntervalArray.from_arrays(lower_bound, upper_bound, closed='left')
-    # force Interval dtype for whole column
+    # force Interval dtype for whole column_name
     df[column_name] = pd.arrays.IntervalArray(df[column_name])
     return df
 
+
 @pf.register_dataframe_method
-def sample_from_binned_column(df: pd.DataFrame, column_name: str, numeric_type='int'):
-    """Reverse the binning of a numeric column, by sampling from the bin ranges"""
+def sample_from_binned_column(df: pd.DataFrame, column_name: str, numeric_type='int', mean=None, std=None):
+    """Reverse the binning of a numeric column, by sampling from the bin ranges. If mean and standard
+    deviation of column are given, then sample from truncated normal, else take the uniform distribution"""
     if numeric_type not in ['int', 'float']:
         raise ValueError("Numeric type must be 'int' or 'float'")
     df = df.copy()
@@ -86,10 +89,24 @@ def sample_from_binned_column(df: pd.DataFrame, column_name: str, numeric_type='
                          "First run .bin_numeric_column on a continuous column")
 
     lower_bound, upper_bound = column.left, column.right
-    if numeric_type == 'int':
-        df.loc[~mask_missing, column_name] = np.random.randint(lower_bound, upper_bound)
-    elif numeric_type == 'float':
-        df.loc[~mask_missing, column_name] = np.random.uniform(lower_bound, upper_bound)
+
+    # sample from truncated normal distribution
+    if mean and std:
+        low = (lower_bound - mean) / std
+        upp = (upper_bound - mean) / std
+        X = truncnorm(low, upp, loc=mean, scale=std)
+
+        sampled_values = X.rvs()
+        if numeric_type == 'int':
+            sampled_values = np.around(sampled_values, decimals=0).astype(int)
+        df.loc[~mask_missing, column_name] = sampled_values
+
+    # sample from uniform distribution
+    else:
+        if numeric_type == 'int':
+            df.loc[~mask_missing, column_name] = np.random.randint(lower_bound, upper_bound)
+        elif numeric_type == 'float':
+            df.loc[~mask_missing, column_name] = np.random.uniform(lower_bound, upper_bound)
     return df
 
 @pf.register_dataframe_method
@@ -138,15 +155,20 @@ def replace_rare_values(df, column, min_support=0.01, new_name='other'):
         normalize = False
         n_records_support = min_support
 
-    column_value_counts = df[column].value_counts(normalize=normalize)
+    column_value_counts = df[column].value_counts(normalize=normalize, dropna=False)
 
     # if no rare categories under min support - no change required
     if not (column_value_counts < min_support).any():
         return df
 
     rare_categories = list(column_value_counts[column_value_counts < min_support].index)
-    print(f"Categories {rare_categories} in column '{column}' occur less than {n_records_support}x "
-          f"and are converted to {new_name}")
+
+    # if mode then replace rare categories with the most frequent value in column (including NaN)
+    if new_name == 'mode':
+        new_name = df[column].mode(dropna=False)[0]
+
+    print(f"Categories in column '{column}' that occur less than {n_records_support}x "
+          f"and are replaced by {new_name} - converted categories: {rare_categories}")
 
     map_value_probs_to_rows = df[column].map(column_value_counts)
     convert_low_freq_rows = df[column].mask(map_value_probs_to_rows < min_support, new_name)
@@ -518,36 +540,3 @@ class GroupRareCategories(BaseReversibleTransformer):
 
 
 if __name__ == '__main__':
-    # data_path = Path("c:/data/1_iknl/processed/bente/cc_9col.csv")
-    # X = pd.read_csv(data_path)
-    # columns = ['tum_topo_sublokalisatie_code', 'tum_differentiatiegraad_code', 'tum_lymfklieren_positief_atl']
-    # # columns = ['tum_lymfklieren_positief_atl']
-    # X = X.loc[:, columns]
-    # print(X.head(20))
-    #
-    # gen_cont = GeneralizeContinuous(n_bins=10, strategy='quantile', labeled_missing=[999])
-    # # X = X.dropna()
-    #
-    # gen_cont.fit(X)
-    # X_cat = gen_cont.transform(X)
-    # print(X_cat)
-    #
-    # X_inv = gen_cont.inverse_transform(X_cat)
-    # print(X_inv)
-    # print(gen_cont.bin_edges_)
-
-    data_path = "examples/data/input/adult_9c.csv"
-    df = pd.read_csv(data_path, delimiter=', ').astype(str)
-    print(df.head())
-    df_s = df[['native-country', 'occupation']]
-
-    # epsilon = float(np.inf)
-    epsilon = 0.1
-    gen_cat = GeneralizeCategorical(epsilon=epsilon, n_bins=5)
-    gen_cat.fit(df_s)
-    df_sT = gen_cat.transform(df_s)
-    df_sT = pd.DataFrame(df_sT, columns=df_s.columns)
-
-    df_sI = pd.DataFrame(gen_cat.inverse_transform(df_sT), columns=df_s.columns)
-
-    visual.compare_value_counts(df_s, df_sI)

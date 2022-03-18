@@ -6,14 +6,16 @@ import seaborn as sns
 
 from scipy.spatial.distance import jensenshannon
 from dython.nominal import associations
+from itertools import combinations
 
+import synthesis.synthesizers.utils as utils
 from synthesis.evaluation._base import BaseMetric, COLOR_PALETTE
 
 
 class MarginalComparison(BaseMetric):
 
-    def __init__(self, labels=None, normalize=True):
-        super().__init__(labels=labels)
+    def __init__(self, labels=None, exclude_columns=None, normalize=True):
+        super().__init__(labels=labels, exclude_columns=exclude_columns)
         self.normalize = normalize
 
     def fit(self, data_original, data_synthetic):
@@ -25,8 +27,8 @@ class MarginalComparison(BaseMetric):
             # compute value_counts for both original and synthetic - align indexes as certain column
             # values in the original data may not have been sampled in the synthetic data
             self.stats_original_[c], self.stats_synthetic_[c] = \
-                data_original[c].astype(str).value_counts(dropna=False, normalize=self.normalize).align(
-                    data_synthetic[c].astype(str).value_counts(dropna=False, normalize=self.normalize),
+                data_original[c].value_counts(dropna=False, normalize=self.normalize).align(
+                    data_synthetic[c].value_counts(dropna=False, normalize=self.normalize),
                     join='outer', axis=0, fill_value=0
                 )
             self.stats_[c] = jensenshannon(self.stats_original_[c], self.stats_synthetic_[c])
@@ -81,8 +83,8 @@ class MarginalComparison(BaseMetric):
 
 class AssociationsComparison(BaseMetric):
 
-    def __init__(self, nom_nom_assoc='theil', nominal_columns='auto', labels=None):
-        super().__init__(labels=labels)
+    def __init__(self, labels=None, exclude_columns=None, nom_nom_assoc='theil', nominal_columns='auto'):
+        super().__init__(labels=labels, exclude_columns=exclude_columns, astype_cat=False)
         self.nom_nom_assoc = nom_nom_assoc
         self.nominal_columns = nominal_columns
 
@@ -104,7 +106,7 @@ class AssociationsComparison(BaseMetric):
     def plot(self):
         pcd = self.score()
 
-        fig, ax = plt.subplots(1, 2, figsize=(8, 6))
+        fig, ax = plt.subplots(1, 2, figsize=(12, 10))
         cbar_ax = fig.add_axes([.91, 0.3, .01, .4])
 
         cmap = sns.diverging_palette(220, 10, as_cmap=True)
@@ -124,3 +126,37 @@ class AssociationsComparison(BaseMetric):
         cbar.ax.tick_params(labelsize=10)
         # fig.tight_layout()
         plt.show()
+
+
+class JointDistributionComparison(BaseMetric):
+
+    def __init__(self, labels=None, exclude_columns=None, normalize=True, n_variables=2):
+        super().__init__(labels=labels, exclude_columns=exclude_columns)
+        self.normalize = normalize
+        self.n_variables = n_variables
+
+    def fit(self, data_original, data_synthetic):
+        data_original, data_synthetic = self._check_input_data(data_original, data_synthetic)
+        self.stats_original_ = {}
+        self.stats_synthetic_ = {}
+        self.stats_ = {}
+
+        variable_combinations = combinations(data_original.columns, self.n_variables)
+        for vars in variable_combinations:
+            # compute joint distributions and convert Factors to series
+            jt_original = utils.compute_distribution(data_original.loc[:, vars]).as_series()
+            jt_synthetic = utils.compute_distribution(data_synthetic.loc[:, vars]).as_series()
+
+            # align both original and synthetic in case values are missing in either dataset
+            jt_original, jt_synthetic = jt_original.align(jt_synthetic, join='outer', fill_value=0, axis=0)
+            self.stats_original_[vars] = jt_original.sort_index()
+            self.stats_synthetic_[vars] = jt_synthetic.sort_index()
+
+            # convert Factor to pd.Series and compute jensen-shannon distance
+            self.stats_[vars] = jensenshannon(jt_original, jt_synthetic)
+
+        return self
+
+    def score(self):
+        average_js_distance = sum(self.stats_.values()) / len(self.stats_.keys())
+        return average_js_distance

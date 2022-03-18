@@ -18,13 +18,13 @@ def synthesis_experiment(X, X_name, synthesizers=None, epsilon=None, n_records_s
         epsilon = [0.01, 0.1, 1]
 
     for sts, e in product(synthesizers, epsilon):
-        synthesizer = sts(epsilon=e, n_records_synth=n_records_synth, verbose=verbose)
+        synthesizer = sts(epsilon=e, verbose=verbose)
         if isinstance(synthesizer, MarginalSynthesizer):
             synthesizer.verbose = 0
 
         synthesizer.fit(X)
-        Xs = synthesizer.transform(X)
-        synthesizer.write_csv(Xs, X_name, data_path)
-        synthesizer.write_class(X_name, model_path)
+        # Xs = synthesizer.sample()
+        # synthesizer.save(model_path)
         print('Synthesis complete for: {}'.format(sts))
 
+    return synthesizer

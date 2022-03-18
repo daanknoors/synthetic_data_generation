@@ -85,8 +85,9 @@ class EnsureConsistentType(BaseEstimator, TransformerMixin):
 
 class TrainBothTestOriginalHoldout(BasePredictiveMetric):
 
-    def __init__(self, y_column=None, random_state=None, n_jobs=None, labels=None):
-        super().__init__(y_column=y_column, random_state=random_state, n_jobs=n_jobs, labels=labels)
+    def __init__(self, labels=None, exclude_columns=None, y_column=None, random_state=None, n_jobs=None):
+        super().__init__(labels=labels, exclude_columns=exclude_columns, astype_cat=False, y_column=y_column,
+                         random_state=random_state, n_jobs=n_jobs)
         # todo make generic, enter any classifier/params but also provide default option
 
     def fit(self, data_original, data_synthetic):
