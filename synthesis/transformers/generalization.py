@@ -535,8 +535,3 @@ class GroupRareCategories(BaseReversibleTransformer):
 #             # todo ensure inverse gives back X_enc which OrdinalEncoder.inverse_transform(X_le)
 #             pass
 
-
-
-
-
-if __name__ == '__main__':
