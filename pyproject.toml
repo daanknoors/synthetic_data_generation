@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "synthetic-data-generation"
-version = "0.1.6"
+version = "0.1.7"
 description = "Algorithms for generating synthetic data"
 authors = ["Daan Knoors <d.knoors@gmail.com>"]
 license = "MIT"

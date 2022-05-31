@@ -159,7 +159,6 @@ class TrainBothTestOriginalHoldout(BasePredictiveMetric):
         plot_roc_curve(self.stats_synthetic_, X_test, y_test, ax=ax, name=self.labels[1], color=COLOR_PALETTE[1])
         ax.plot([0, 1], [0, 1], linestyle='--', lw=1, color='black', alpha=.8)
         plt.title('ROC Curve')
-        plt.show()
 
     def _split_xy(self, data):
         y = data[self.y_column]

@@ -90,7 +90,6 @@ class OriginalDataEvaluator():
 
             ax[idx].legend()
         fig.tight_layout()
-        plt.show()
 
     @staticmethod
     def get_high_cardinality_columns(data, threshold):

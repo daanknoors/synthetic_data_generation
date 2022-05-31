@@ -79,7 +79,6 @@ class MarginalComparison(BaseMetric):
 
             ax[idx].legend()
         fig.tight_layout()
-        plt.show()
 
 class AssociationsComparison(BaseMetric):
 
@@ -125,7 +124,6 @@ class AssociationsComparison(BaseMetric):
         cbar = heatmap_original.collections[0].colorbar
         cbar.ax.tick_params(labelsize=10)
         # fig.tight_layout()
-        plt.show()
 
 
 class JointDistributionComparison(BaseMetric):
