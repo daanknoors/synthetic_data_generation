@@ -44,6 +44,7 @@ class MarginalComparison(BaseMetric):
         fig, ax = plt.subplots(len(column_names), 1, figsize=(8, len(column_names) * 4))
 
         for idx, col in enumerate(column_names):
+            ax_i = ax[idx] if len(column_names) > 1 else ax
 
             column_value_counts_original = self.stats_original_[col]
             column_value_counts_synthetic = self.stats_synthetic_[col]
@@ -53,31 +54,30 @@ class MarginalComparison(BaseMetric):
 
             # with small column cardinality plot original distribution as bars, else plot as line
             if len(column_value_counts_original.values) <= 25:
-                ax[idx].bar(x=bar_position, height=column_value_counts_original.values,
+                ax_i.bar(x=bar_position, height=column_value_counts_original.values,
                             color=COLOR_PALETTE[0], label=self.labels[0], width=bar_width)
             else:
-                ax[idx].plot(bar_position + bar_width, column_value_counts_original.values, marker='o',
+                ax_i.plot(bar_position + bar_width, column_value_counts_original.values, marker='o',
                              markersize=3, color=COLOR_PALETTE[0], linewidth=2, label=self.labels[0])
 
             # synthetic distribution
-            ax[idx].bar(x=bar_position + bar_width, height=column_value_counts_synthetic.values,
+            ax_i.bar(x=bar_position + bar_width, height=column_value_counts_synthetic.values,
                         color=COLOR_PALETTE[1], label=self.labels[1], width=bar_width)
 
-            ax[idx].set_xticks(bar_position + bar_width / 2)
+            ax_i.set_xticks(bar_position + bar_width / 2)
             if len(column_value_counts_original.values) <= 25:
-                ax[idx].set_xticklabels(column_value_counts_original.keys(), rotation=25)
+                ax_i.set_xticklabels(column_value_counts_original.keys(), rotation=25)
             else:
-                ax[idx].set_xticklabels('')
-            # ax[idx].set_title('Column: ' +  r"$\bf{" + col + "}$" +
-            #                   ' ~ jensen-shannon distance: ' + '{:.2f}'.format(self.stats_[col]))
-            title = r"$\bf{" + col.replace('_', '\_') + "}$" + "\n jensen-shannon distance: {:.2f}".format(self.stats_[col])
-            ax[idx].set_title(title)
-            if self.normalize:
-                ax[idx].set_ylabel('Probability')
-            else:
-                ax[idx].set_ylabel('Count')
+                ax_i.set_xticklabels('')
 
-            ax[idx].legend()
+            title = r"$\bf{" + col.replace('_', '\_') + "}$" + "\n jensen-shannon distance: {:.2f}".format(self.stats_[col])
+            ax_i.set_title(title)
+            if self.normalize:
+                ax_i.set_ylabel('Probability')
+            else:
+                ax_i.set_ylabel('Count')
+
+            ax_i.legend()
         fig.tight_layout()
 
 class AssociationsComparison(BaseMetric):
