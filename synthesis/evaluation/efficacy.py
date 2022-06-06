@@ -11,8 +11,8 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import GridSearchCV
 from sklearn.compose import ColumnTransformer
-from sklearn.metrics import roc_auc_score, plot_roc_curve
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay
+from sklearn.base import BaseEstimator, TransformerMixin, clone
 
 from synthesis.evaluation._base import BaseMetric, BasePredictiveMetric, COLOR_PALETTE
 
@@ -83,33 +83,15 @@ class EnsureConsistentType(BaseEstimator, TransformerMixin):
         return X.astype(self.dtype)
 
 
-class TrainBothTestOriginalHoldout(BasePredictiveMetric):
+class GenericColumnTransformer(BaseEstimator, TransformerMixin):
+    """Performs standard processing operations on numeric and categorical columns"""
+    def __init__(self, categorical_columns=None, numeric_columns=None):
+        self.categorical_columns = categorical_columns
+        self.numeric_columns = numeric_columns
 
-    def __init__(self, labels=None, exclude_columns=None, y_column=None, random_state=None, n_jobs=None):
-        super().__init__(labels=labels, exclude_columns=exclude_columns, astype_cat=False, y_column=y_column,
-                         random_state=random_state, n_jobs=n_jobs)
-        # todo make generic, enter any classifier/params but also provide default option
-
-    def fit(self, data_original, data_synthetic):
-        data_original, data_synthetic = self._check_input_data(data_original, data_synthetic)
-
-        if self.y_column is None:
-            self.y_column = data_original.columns[-1]
-
-        X_original, y_original = self._split_xy(data_original)
-        X_synthetic, y_synthetic = self._split_xy(data_synthetic)
-
-        self.stats_original_ = self._fit(X_original, y_original)
-        self.stats_synthetic_ = self._fit(X_synthetic, y_synthetic)
-
-    def _fit(self, X, y):
-        categorical_features = X.select_dtypes(include=['object']).columns
-        numeric_features = [feat for feat in X.columns if not feat in categorical_features]
-
-        preprocessor_num = Pipeline(steps=[
-            ('simple_imputer_num', SimpleImputer(strategy='median')),
-            ('num_scaling', MinMaxScaler()),
-        ])
+    def fit(self, X, y=None):
+        cat_cols = self.categorical_columns if self.categorical_columns else X.select_dtypes(include=['object']).columns
+        num_cols = self.numeric_columns if self.numeric_columns else [c for c in X.columns if c not in cat_cols]
 
         preprocessor_cat = Pipeline(steps=[
             ('simple_imputer_cat', SimpleImputer(strategy='most_frequent')),
@@ -117,36 +99,51 @@ class TrainBothTestOriginalHoldout(BasePredictiveMetric):
             ('categorical_encoding', OneHotEncoder(handle_unknown='ignore'))
         ])
 
-        preprocessor = ColumnTransformer(transformers=[
-            ('num', preprocessor_num, numeric_features),
-            ('cat', preprocessor_cat, categorical_features)
+        preprocessor_num = Pipeline(steps=[
+            ('simple_imputer_num', SimpleImputer(strategy='median')),
+            ('num_scaling', MinMaxScaler()),
         ])
 
+        self.preprocessor = ColumnTransformer(transformers=[
+            ('cat', preprocessor_cat, cat_cols),
+            ('num', preprocessor_num, num_cols)
+        ])
+        self.preprocessor.fit(X, y)
+        return self
 
-        # Classifier
-        clf_rf = RandomForestClassifier(class_weight='balanced', min_samples_leaf=0.05, random_state=self.random_state)
+    def transform(self, X, y=None):
+        return self.preprocessor.transform(X)
 
-        # Pipeline
-        pipe = Pipeline([('preprocessor', preprocessor),
-                         ('classifier', clf_rf)])
 
-        # Grid search
-        params = {'classifier__n_estimators': [100, 150, 200],
-                  'classifier__criterion': ['entropy', 'gini'],
-                  'classifier__max_depth': [3, 5, 10],
-                  'classifier__max_features': ['sqrt', 'log2']}
+class ClassifierComparison(BasePredictiveMetric):
 
-        grid_rf = GridSearchCV(pipe, param_grid=params, scoring='roc_auc', refit=True, cv=3, verbose=2,
-                               n_jobs=self.n_jobs)
-        grid_rf.fit(X, y)
-        return grid_rf
+    def __init__(self, clf=None, labels=None, exclude_columns=None, y_column=None, random_state=None, n_jobs=None):
+        super().__init__(labels=labels, exclude_columns=exclude_columns, astype_cat=False, y_column=y_column,
+                         random_state=random_state, n_jobs=n_jobs)
+        self.clf = clf
+
+    def fit(self, data_original, data_synthetic):
+        self._check_input_args(data_original)
+        data_original, data_synthetic = self._check_input_data(data_original, data_synthetic)
+
+        X_original, y_original = self._split_xy(data_original)
+        X_synthetic, y_synthetic = self._split_xy(data_synthetic)
+
+        self.stats_original_ = self._fit(X_original, y_original)
+        self.stats_synthetic_ = self._fit(X_synthetic, y_synthetic)
+        return self
+
+    def _fit(self, X, y):
+        # clone clf to construct a new unfitted estimator with same parameters
+        clf = clone(self.clf) if self.clf else self._get_default_classifier()
+        return clf.fit(X, y)
 
     def score(self, data_original_test):
         X_test, y_test = self._split_xy(data_original_test)
 
         scores = {
-            "roc_auc_original": roc_auc_score(y_test, self.stats_original_.predict_proba(X_test)[:, 1]),
-            "roc_auc_synthetic": roc_auc_score(y_test, self.stats_synthetic_.predict_proba(X_test)[:, 1])
+            "score_original": self.stats_original_.score(X_test, y_test),
+            "score_synthetic": self.stats_synthetic_.score(X_test, y_test)
         }
         return scores
 
@@ -154,13 +151,49 @@ class TrainBothTestOriginalHoldout(BasePredictiveMetric):
         """"Plot ROC-AOC Curves of both original and synthetic in single figure"""
         X_test, y_test = self._split_xy(data_original_test)
 
-        fig, ax = plt.subplots()
-        plot_roc_curve(self.stats_original_, X_test, y_test, ax=ax, name=self.labels[0], color=COLOR_PALETTE[0])
-        plot_roc_curve(self.stats_synthetic_, X_test, y_test, ax=ax, name=self.labels[1], color=COLOR_PALETTE[1])
-        ax.plot([0, 1], [0, 1], linestyle='--', lw=1, color='black', alpha=.8)
-        plt.title('ROC Curve')
+        fig, ax = plt.subplots(1, 2, figsize=(14, 6))
+        sns.despine()
+        # roc curve
+        RocCurveDisplay.from_estimator(self.stats_original_, X_test, y_test, name=self.labels[0],
+                                       color=COLOR_PALETTE[0], ax=ax[0])
+        RocCurveDisplay.from_estimator(self.stats_synthetic_, X_test, y_test, name=self.labels[1],
+                                       color=COLOR_PALETTE[1], ax=ax[0])
+
+        ax[0].plot([0, 1], [0, 1], linestyle="--", lw=1, color="black", alpha=0.7)
+        ax[0].set_title('ROC Curve')
+
+        # pr curve
+        PrecisionRecallDisplay.from_estimator(self.stats_original_, X_test, y_test, name=self.labels[0],
+                                       color=COLOR_PALETTE[0], ax=ax[1])
+        PrecisionRecallDisplay.from_estimator(self.stats_synthetic_, X_test, y_test, name=self.labels[1],
+                                              color=COLOR_PALETTE[1], ax=ax[1])
+        no_skill = len(y_test[y_test == 1]) / len(y_test)
+        ax[1].plot([0, 1], [no_skill, no_skill], lw=1, linestyle='--', color='black', alpha=0.7)
+        ax[1].set_title('Precision-Recall Curve')
 
     def _split_xy(self, data):
         y = data[self.y_column]
         X = data.drop(self.y_column, axis=1)
         return X, y
+
+    def _get_default_classifier(self):
+        # load generic preprocessor with distinct transformers for numeric and categorical features
+        preprocessor = GenericColumnTransformer()
+
+        # Classifier
+        rf = RandomForestClassifier(class_weight='balanced', min_samples_leaf=0.05,
+                                        random_state=self.random_state)
+
+        # Pipeline
+        pipe = Pipeline([('preprocessor', preprocessor),
+                         ('classifier', rf)])
+
+        # Grid search
+        params = {'classifier__n_estimators': [100, 200, 500],
+                  'classifier__criterion': ['entropy', 'gini'],
+                  'classifier__max_depth': [3, 5, 10]}
+
+        # use average precision as default scoring as it also works well on imbalanced data
+        clf = GridSearchCV(pipe, param_grid=params, scoring='average_precision', refit=True, cv=3, verbose=1,
+                               n_jobs=self.n_jobs)
+        return clf

@@ -48,7 +48,8 @@ class BaseMetric(ABC):
 
 class BasePredictiveMetric(BaseMetric):
 
-    def __init__(self,  labels=None, exclude_columns=None, astype_cat=True, y_column=None, random_state=None, n_jobs=None):
+    def __init__(self,  labels=None, exclude_columns=None, astype_cat=True, y_column=None,
+                 random_state=None, n_jobs=None):
         super().__init__(labels=labels, exclude_columns=exclude_columns, astype_cat=astype_cat)
         self.y_column = y_column
         self.random_state = random_state
@@ -56,3 +57,7 @@ class BasePredictiveMetric(BaseMetric):
 
     def score(self, data_original_test):
         raise NotImplementedError("Implement score method")
+
+    def _check_input_args(self, data_original):
+        if self.y_column is None:
+            self.y_column = data_original.columns[-1]
