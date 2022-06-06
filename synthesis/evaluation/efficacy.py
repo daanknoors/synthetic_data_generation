@@ -1,6 +1,7 @@
 """Methods to determine whether the synthetic data performs similar to the original data on specific tasks"""
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -90,8 +91,20 @@ class GenericColumnTransformer(BaseEstimator, TransformerMixin):
         self.numeric_columns = numeric_columns
 
     def fit(self, X, y=None):
-        cat_cols = self.categorical_columns if self.categorical_columns else X.select_dtypes(include=['object']).columns
-        num_cols = self.numeric_columns if self.numeric_columns else [c for c in X.columns if c not in cat_cols]
+        if self.categorical_columns:
+            self.categorical_columns_ = self.categorical_columns
+        else:
+            self.categorical_columns_ = list(X.select_dtypes(include=['object']).columns)
+
+        if self.numeric_columns:
+            self.numeric_columns_ = self.numeric_columns
+        else:
+            self.numeric_columns_ = [c for c in X.columns if c not in self.categorical_columns_]
+
+        preprocessor_num = Pipeline(steps=[
+            ('simple_imputer_num', SimpleImputer(strategy='median')),
+            ('num_scaling', MinMaxScaler()),
+        ])
 
         preprocessor_cat = Pipeline(steps=[
             ('simple_imputer_cat', SimpleImputer(strategy='most_frequent')),
@@ -99,14 +112,10 @@ class GenericColumnTransformer(BaseEstimator, TransformerMixin):
             ('categorical_encoding', OneHotEncoder(handle_unknown='ignore'))
         ])
 
-        preprocessor_num = Pipeline(steps=[
-            ('simple_imputer_num', SimpleImputer(strategy='median')),
-            ('num_scaling', MinMaxScaler()),
-        ])
-
+        # first do numeric columns as categorical will create new columns
         self.preprocessor = ColumnTransformer(transformers=[
-            ('cat', preprocessor_cat, cat_cols),
-            ('num', preprocessor_num, num_cols)
+            ('num', preprocessor_num, self.numeric_columns_),
+            ('cat', preprocessor_cat, self.categorical_columns_)
         ])
         self.preprocessor.fit(X, y)
         return self
@@ -197,3 +206,60 @@ class ClassifierComparison(BasePredictiveMetric):
         clf = GridSearchCV(pipe, param_grid=params, scoring='average_precision', refit=True, cv=3, verbose=1,
                                n_jobs=self.n_jobs)
         return clf
+
+
+class FeatureImportanceComparison(ClassifierComparison):
+    """Fit a Random Forest model on both datasets and compare the feature importances
+    Note: only works with default model in ClassifierComparison"""
+
+    def __init__(self, y_column=None, random_state=None, n_jobs=None):
+        super().__init__(y_column=y_column, random_state=random_state, n_jobs=n_jobs)
+
+    def fit(self, data_original, data_synthetic):
+        # run default classifier comparison with RandomForest GridSearch
+        super().fit(data_original, data_synthetic)
+
+        # get feature importances
+        self.fi_original_ = self._get_feature_importance(self.stats_original_.best_estimator_, name=self.labels[0])
+        self.fi_synthetic_ = self._get_feature_importance(self.stats_synthetic_.best_estimator_, name=self.labels[1])
+
+        # align feature importances, as some values in columns might not be sampled in synthetic data
+        self.fi_original_, self.stats_synthetic_ = \
+            self.fi_original_.align(self.fi_synthetic_,join='outer', axis=0, fill_value=0)
+        return self
+
+    def plot(self, data_original_test, top=30):
+        # merge feature importances
+        df_fi = pd.merge(self.fi_original_, self.fi_synthetic_, left_index=True, right_index=True, how='outer').fillna(0)
+
+        # transform index column with feature name to column
+        df_fi = df_fi.rename_axis('feature').reset_index()
+
+        # take most importance features from the original model
+        df_fi = df_fi.sort_values(by=df_fi.columns[1], ascending=False)[:top]
+
+        # melt to tidy format
+        df_fi = df_fi.melt(id_vars='feature').rename(columns={'variable': 'data', 'value': 'importance'})
+
+        # plot feature importance comparison
+        fig, ax = plt.subplots(figsize=(6, 10))
+        sns.despine()
+        sns.barplot(data=df_fi, y='feature', x='importance', hue='data', palette=COLOR_PALETTE, ax=ax)
+        ax.legend(loc='lower right')
+        ax.set_title('Random Forest feature importance comparison')
+
+
+    def _get_feature_importance(self, clf, name):
+        # get feature names after one hot encoding the categorical columns
+        onehot_features = (clf.named_steps['preprocessor'].preprocessor.named_transformers_['cat']
+                           .named_steps['categorical_encoding']
+                           .get_feature_names_out(clf.named_steps['preprocessor'].categorical_columns_))
+
+        # get numeric columns
+        numeric_columns = clf.named_steps['preprocessor'].numeric_columns_
+        feature_names_original = numeric_columns + list(onehot_features)
+
+        df_feature_importances = pd.Series(clf.named_steps['classifier'].feature_importances_,
+                                           index=feature_names_original, name=f'{name}')
+        return df_feature_importances
+
