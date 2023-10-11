@@ -19,7 +19,7 @@ DEFAULT_METRICS = {
 
 class SyntheticDataEvaluator(BaseMetric):
     """Class to compare synthetic data to the original"""
-    def __init__(self, metrics=None):
+    def __init__(self, metrics):
         """Choose which metrics to compute"""
         self.metrics = metrics
 
