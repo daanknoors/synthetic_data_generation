@@ -39,10 +39,6 @@ class BaseMetric(ABC):
         if self.astype_cat:
             data_original = astype_categorical(data_original, include_nan=True)
             data_synthetic = astype_categorical(data_synthetic, include_nan=True)
-
-        # todo check data alignment, i.e. whether synthetic data has same columns and categories as original
-        # todo warn if dataset does not have same dimensions
-        # todo convert column_name dtypes synthetic to original dtypes - warn user.
         return data_original, data_synthetic
 
 

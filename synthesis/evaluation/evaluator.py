@@ -19,8 +19,9 @@ DEFAULT_METRICS = {
 
 class SyntheticDataEvaluator(BaseMetric):
     """Class to compare synthetic data to the original"""
-    def __init__(self, metrics):
+    def __init__(self, metrics=None, labels=None, exclude_columns=None, astype_cat=True):
         """Choose which metrics to compute"""
+        super().__init__(labels=labels, exclude_columns=exclude_columns, astype_cat=False)
         self.metrics = metrics
 
     def fit(self, data_original, data_synthetic):

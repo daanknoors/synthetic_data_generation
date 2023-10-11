@@ -92,10 +92,10 @@ class AssociationsComparison(BaseMetric):
 
         self.stats_original_ = associations(data_original, nom_nom_assoc=self.nom_nom_assoc,
                                             nominal_columns=self.nominal_columns, nan_replace_value='nan',
-                                            compute_only=True)['corr']
+                                            compute_only=True)['corr'].astype(float)
         self.stats_synthetic_ = associations(data_synthetic, nom_nom_assoc=self.nom_nom_assoc,
                                              nominal_columns=self.nominal_columns, nan_replace_value='nan',
-                                             compute_only=True)['corr']
+                                             compute_only=True)['corr'].astype(float)
         return self
 
     def score(self):

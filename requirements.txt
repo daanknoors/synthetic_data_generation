@@ -1,4 +1,4 @@
-diffprivlib==0.5.1
+diffprivlib==0.6.3
 dill==0.3.7
 dython==0.6.7
 joblib==1.2.0
