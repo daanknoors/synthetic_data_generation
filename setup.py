@@ -13,7 +13,7 @@ setup(
         'dython==0.6.7',
         'joblib>=1.0.1',
         'lifelines>=0.26.0',
-        'matplotlib==3.7.2',
+        'matplotlib>=3.4.3',
         'numpy>=1.21.2',
         'pandas>=1.3.2',
         'pyjanitor>=0.21.2',
@@ -23,5 +23,5 @@ setup(
         'seaborn>=0.12.0',
         'thomas_core==0.1.3'
     ],
-    extras_require={'interactive': ['matplotlib>=2.2.0', 'jupyter']},
+    extras_require={'interactive': ['matplotlib', 'jupyter']},
 )
