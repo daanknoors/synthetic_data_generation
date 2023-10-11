@@ -193,19 +193,6 @@ class PrivBayes(BaseDPSynthesizer):
             scores = [self.r_score(data, pair.attribute, pair.parents) for pair in ap_pairs]
         return scores
 
-    # def _compute_scores(self, data, ap_pairs):
-    #     """Compute score for all ap_pairs"""
-    #     scores = np.empty(len(ap_pairs))
-    #
-    #     for idx, pair in enumerate(ap_pairs):
-    #         if pair.parents is None:
-    #             scores[idx] = 0
-    #         elif self.score_function == 'R':
-    #                 scores[idx] = self.r_score(data, pair.attribute, pair.parents)
-    #         elif self.score_function == 'MI':
-    #             scores[idx] = self.mi_score(data, pair.attribute, pair.parents)
-    #     return scores
-
     def _exponential_mechanism(self, ap_pairs, scores):
         """select APPair with exponential mechanism"""
         local_epsilon = self.epsilon * self.epsilon_split / self._n_nodes_dp_computed
@@ -483,23 +470,11 @@ if __name__ == "__main__":
     pb.score(data, df_synth, score_dict=True)
 
     """test pb with init network"""
-    # init_network = [AP_pair(node='age', parents=None),
-    #                 AP_pair(node='education', parents=('age',)),
-    #                 AP_pair(node='sex', parents=('age', 'education'))]
-    #
-    # pbinit = PrivBayes()
-    # pbinit.set_network(init_network)
-    # pbinit.fit(df)
-    # df_synth_init = pbinit.sample(1000)
 
     # fixing a network - specify init network to fix those variables when generating
     pbfix = PrivBayesFix(epsilon=1, n_cpus=4)
     init_network = [APPair('age', None), APPair('education', ('age',))]
-    # init_network = [APPair(node='age', parents=None),
-    #                 APPair(node='education', parents=('age',)),
-    #                 APPair(node='sex', parents=('age', 'education')),
-    #                 APPair(node='workclass', parents=('age', 'education')),
-    #                 APPair(node='income', parents=('sex', 'age'))]
+
     pbfix.set_network(init_network)
     pbfix.fit(data)
     df_synth_remaining = pbfix.sample_remaining_columns(df_synth[['age', 'education']])

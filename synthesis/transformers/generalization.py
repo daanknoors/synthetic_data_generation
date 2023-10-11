@@ -395,39 +395,12 @@ class GeneralizeCategorical(GeneralizeContinuous):
 
             self._marginal_group_alloc.append(marginal_group_alloc)
 
-            # lower_bounds = np.int_(bin_edges[np.int_(X_enc[:, jj])])
-            # upper_bounds = np.int_(bin_edges[np.int_(X_enc[:, jj]) + 1])
-
             for i in range(n_records):
-                # Values which are close to a bin edge are susceptible to numeric
-                # instability. Add eps to X so these values are binned correctly
-                # with respect to their decimal truncation. See documentation of
-                # numpy.isclose for an explanation of ``rtol`` and ``atol``.
-                # rtol = 1.e-5
-                # atol = 1.e-8
-                # eps = atol + rtol * np.abs(upper_bounds[i])
-                # marginal_candidates = marginals[
-                #     (marginals.keys() >= lower_bounds[i]) &
-                #     (marginals.keys() < upper_bounds[i] + eps)]
-
-                #np.where returns 1d tuple, thus index 0
                 marginal_candidate_idx = np.where(X_enc[i, jj] == marginal_group_alloc)[0]
                 marginal_candidate_probs = marginals[marginal_candidate_idx]
                 marginal_candidate_probs_normalized = _normalize_distribution(marginal_candidate_probs)
 
-
-                # marginal_idx = np.arange(lower_bounds[i], upper_bounds[i])
-                # marginal_probs = marginals[marginal_idx]
-
-                # marginal_probs_normalized = marginal_probs / marginal_probs.sum()
-                # sample encoded (numerical) value based on marginal probabilities
-                # print(jj)
-                # print(X_enc.shape)
-                # print(X_enc[i, jj])
-                # print(marginal_candidate_idx)
                 X_enc[i, jj] = np.random.choice(marginal_candidate_idx, p=marginal_candidate_probs_normalized)
-
-                # X_enc[i, jj] = np.random.choice(list(marginal_candidates.keys()), p=marginal_candidates_normalized.values)
 
         # inverse transform numerical value to original categorical
         X_inv = self._ordinalencoder.inverse_transform(X_enc)
@@ -499,39 +472,3 @@ class GroupRareCategories(BaseReversibleTransformer):
     def transform(self, X, y=None):
         """Group categories that occur less then threshold"""
         return X.mask(X.map(X.value_counts(normalize=True)) < self.threshold, self.name_group)
-
-# class GeneralizeCategorical(GeneralizeContinuous):
-#
-#     def __init__(self, epsilon=1.0, n_bins=10, strategy='uniform', labeled_missing=None):
-#         super().__init__(n_bins=n_bins, strategy=strategy, encode='ordinal')
-#         self.epsilon = epsilon
-#
-#     def fit(self, X, y=None):
-#         # if user-specified bins in form of iterable or dict
-#         if self.bins:
-#             pass
-#
-#         self.marginals_ = {}
-#         self._ordinalencoders = {}
-#         X_enc = np.empty_like(X)
-#         for jj, c in enumerate(X.columns):
-#             uniques = sorted(set(X[c]))
-#             uniques, counts = X[c].value_counts(dropna=False)
-#
-#             local_epsilon = self.epsilon / X.shape[1]
-#             self.marginals_[c] = dp_marginal_distribution(X[c], local_epsilon)
-#
-#             # get numeric values - store encoder for inverse transform
-#             self._ordinalencoders[c] = OrdinalEncoder().fit(X[c])
-#             X_enc[:, jj] = self._ordinalencoders[c].transform(X[c])
-#
-#
-#         return super().fit(X_enc, y)
-#
-#     def inverse_transform(self, Xt):
-#         X_enc = super().inverse_transform(Xt)
-#         for jj in range(X_enc.shape[1]):
-#             # todo fix column names indexing
-#             # todo ensure inverse gives back X_enc which OrdinalEncoder.inverse_transform(X_le)
-#             pass
-
