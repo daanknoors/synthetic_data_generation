@@ -2,11 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
     name='synthetic_data_generation',
-    version='0.1.10',
+    version='0.1.11',
     description='Algorithms for generating synthetic data',
     author='Daan Knoors',
     author_email='d.knoors@gmail.com',
-    packages=find_packages(include=['synthesis', 'synthesis/**/*.py']),
+    packages=find_packages(include=['synthesis']),
     install_requires=[
         'diffprivlib>=0.5.1',
         'dill>=0.3.4',
@@ -23,5 +23,5 @@ setup(
         'seaborn>=0.12.0',
         'thomas_core==0.1.3'
     ],
-    extras_require={'interactive': ['matplotlib', 'jupyter']},
+    extras_require={'interactive': ['jupyter']},
 )
