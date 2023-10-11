@@ -1,6 +1,6 @@
 diffprivlib==0.6.3
 dill==0.3.7
-dython==0.6.7
+dython==0.6.8
 joblib==1.2.0
 lifelines==0.27.8
 matplotlib==3.7.2
