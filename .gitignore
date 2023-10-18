@@ -121,3 +121,5 @@ examples/data/input/chicago_crimes_2012_2017.csv
 **/utility_evaluation
 
 *.ctl
+.tsdsyncignore
+.DS_store
