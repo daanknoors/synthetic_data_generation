@@ -14,6 +14,8 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay
 from sklearn.base import BaseEstimator, TransformerMixin, clone
+from sklearn.linear_model import LogisticRegression
+
 
 from synthesis.evaluation._base import BaseMetric, BasePredictiveMetric, COLOR_PALETTE
 
@@ -125,13 +127,17 @@ class GenericColumnTransformer(BaseEstimator, TransformerMixin):
 
 
 class ClassifierComparison(BasePredictiveMetric):
+    """Class to compare performance of a classifier on both original and synthetic data"""
 
-    def __init__(self, clf=None, labels=None, exclude_columns=None, y_column=None, random_state=None, n_jobs=None):
+    def __init__(self, clf=None, default_clf=None, labels=None, exclude_columns=None, y_column=None, random_state=None, n_jobs=None):
         super().__init__(labels=labels, exclude_columns=exclude_columns, astype_cat=False, y_column=y_column,
                          random_state=random_state, n_jobs=n_jobs)
+        """Define clf or use a a default classifier 'lr' (logistic_regression) or 'rf' (random_forest)"""
         self.clf = clf
+        self.default_clf = default_clf
 
     def fit(self, data_original, data_synthetic):
+        """Fit classifier on both datasets"""
         self._check_input_args(data_original)
         data_original, data_synthetic = self._check_input_data(data_original, data_synthetic)
 
@@ -143,11 +149,13 @@ class ClassifierComparison(BasePredictiveMetric):
         return self
 
     def _fit(self, X, y):
+        """Fit classifier on data"""
         # clone clf to construct a new unfitted estimator with same parameters
-        clf = clone(self.clf) if self.clf else self._get_default_classifier()
+        clf = clone(self.clf) if self.clf is not None else self._select_default_clf()
         return clf.fit(X, y)
 
     def score(self, data_original_test):
+        """Score both original and synthetic data on test data"""
         X_test, y_test = self._split_xy(data_original_test)
 
         scores = {
@@ -181,39 +189,37 @@ class ClassifierComparison(BasePredictiveMetric):
         ax[1].set_title('Precision-Recall Curve')
 
     def _split_xy(self, data):
+        """Split data into X and y"""
         y = data[self.y_column]
         X = data.drop(self.y_column, axis=1)
         return X, y
+    
+    def _select_default_clf(self):
+        """Select default classifier"""
+        if self.default_clf == 'lr':
+            return default_logreg_pipeline(random_state=self.random_state)
+        elif self.default_clf == 'rf':
+            return default_randomforest_pipeline(random_state=self.random_state)
+        else:
+            raise ValueError(f"Unknown default classifier {self.default_clf}, select 'lr' or 'rf'")
 
-    def _get_default_classifier(self):
-        # load generic preprocessor with distinct transformers for numeric and categorical features
-        preprocessor = GenericColumnTransformer()
-
-        # Classifier
-        rf = RandomForestClassifier(class_weight='balanced', min_samples_leaf=0.05,
-                                        random_state=self.random_state)
-
-        # Pipeline
-        pipe = Pipeline([('preprocessor', preprocessor),
-                         ('classifier', rf)])
-
-        # Grid search
-        params = {'classifier__n_estimators': [100, 200, 500],
-                  'classifier__criterion': ['entropy', 'gini'],
-                  'classifier__max_depth': [3, 5, 10]}
-
-        # use average precision as default scoring as it also works well on imbalanced data
-        clf = GridSearchCV(pipe, param_grid=params, scoring='average_precision', refit=True, cv=3, verbose=1,
-                               n_jobs=self.n_jobs)
-        return clf
+    def _check_input_args(self, data_original):
+        """Check whether input arguments are valid"""
+        if self.clf is None and self.default_clf is None:
+            raise ValueError('Either clf or default_clf must be set')
+        if self.clf is not None and self.default_clf is not None:
+            raise ValueError('Only one of clf or default_clf can be set')            
+        return super()._check_input_args(data_original)
 
 
 class FeatureImportanceComparison(ClassifierComparison):
-    """Fit a Random Forest model on both datasets and compare the feature importances
-    Note: only works with default model in ClassifierComparison"""
+    """Fit a Random Forest or Logistic Regression model on both datasets and compare the feature importances
+    or the coefficients respectively.
+    Note: only works with default models in ClassifierComparison"""
 
-    def __init__(self, y_column=None, random_state=None, n_jobs=None):
-        super().__init__(y_column=y_column, random_state=random_state, n_jobs=n_jobs)
+    def __init__(self, default_clf, y_column=None, exclude_columns=None, random_state=None, n_jobs=None):
+        """Define clf or use a a default classifier (logistic_regression or random_forest)"""
+        super().__init__(default_clf=default_clf, y_column=y_column, exclude_columns=exclude_columns, random_state=random_state, n_jobs=n_jobs)
 
     def fit(self, data_original, data_synthetic):
         # run default classifier comparison with RandomForest GridSearch
@@ -246,7 +252,11 @@ class FeatureImportanceComparison(ClassifierComparison):
         sns.despine()
         sns.barplot(data=df_fi, y='feature', x='importance', hue='data', palette=COLOR_PALETTE, ax=ax)
         ax.legend(loc='lower right')
-        ax.set_title('Random Forest feature importance comparison')
+        if self.default_clf == 'lr':
+            ax.set_title('Logistic Regression coefficient comparison')
+            ax.set_xlabel('coefficient')
+        else:
+            ax.set_title('Random Forest feature importance comparison')
 
 
     def _get_feature_importance(self, clf, name):
@@ -259,7 +269,56 @@ class FeatureImportanceComparison(ClassifierComparison):
         numeric_columns = clf.named_steps['preprocessor'].numeric_columns_
         feature_names_original = numeric_columns + list(onehot_features)
 
-        df_feature_importances = pd.Series(clf.named_steps['classifier'].feature_importances_,
-                                           index=feature_names_original, name=f'{name}')
+        # get feature importances
+        if self.default_clf == 'lr':
+            fi = clf.named_steps['classifier'].coef_[0]
+        else:
+            fi = clf.named_steps['classifier'].feature_importances_
+
+        df_feature_importances = pd.Series(fi, index=feature_names_original, name=f'{name}')
         return df_feature_importances
 
+
+def default_logreg_pipeline(random_state=None):
+    """Default logistic regression pipeline with grid search"""
+    # load generic preprocessor with distinct transformers for numeric and categorical features
+    preprocessor = GenericColumnTransformer()
+
+    # Classifier
+    rf = LogisticRegression(penalty='l2', max_iter=1000, random_state=random_state)
+
+    # Pipeline
+    pipe = Pipeline([('preprocessor', preprocessor),
+                    ('classifier', rf)])
+
+    # Grid search
+    params = {
+    'classifier__C': np.logspace(-4, 4, 10),
+    'classifier__class_weight': ['balanced', None]}
+
+    # use average precision as default scoring as it also works well on imbalanced data
+    clf_logreg = GridSearchCV(pipe, param_grid=params, scoring='average_precision', refit=True, cv=3, verbose=0, n_jobs=-1)
+    return clf_logreg
+
+
+def default_randomforest_pipeline(random_state=None):
+    """Default random forest pipeline with grid search"""
+    # load generic preprocessor with distinct transformers for numeric and categorical features
+    preprocessor = GenericColumnTransformer()
+
+    # Classifier
+    rf = RandomForestClassifier(class_weight='balanced', min_samples_leaf=0.05,
+                                    random_state=random_state)
+
+    # Pipeline
+    pipe = Pipeline([('preprocessor', preprocessor),
+                        ('classifier', rf)])
+
+    # Grid search
+    params = {'classifier__n_estimators': [100, 200, 500],
+                'classifier__criterion': ['entropy', 'gini'],
+                'classifier__max_depth': [3, 5, 10]}
+
+    # use average precision as default scoring as it also works well on imbalanced data
+    clf = GridSearchCV(pipe, param_grid=params, scoring='average_precision', refit=True, cv=3, verbose=1, n_jobs=-1)
+    return clf
