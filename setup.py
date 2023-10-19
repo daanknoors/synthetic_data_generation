@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='synthetic_data_generation',
-    version='0.1.13',
+    version='0.1.14',
     description='Algorithms for generating synthetic data',
     author='Daan Knoors',
     author_email='d.knoors@gmail.com',
