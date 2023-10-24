@@ -85,6 +85,9 @@ class EnsureConsistentType(BaseEstimator, TransformerMixin):
     def transform(self, X, y=None):
         return X.astype(self.dtype)
 
+    def get_feature_names_out(self, input_features=None):
+        return input_features
+
 
 class GenericColumnTransformer(BaseEstimator, TransformerMixin):
     """Performs standard processing operations on numeric and categorical columns"""
@@ -124,6 +127,9 @@ class GenericColumnTransformer(BaseEstimator, TransformerMixin):
 
     def transform(self, X, y=None):
         return self.preprocessor.transform(X)
+
+    def get_feature_names_out(self, input_features=None):
+        return self.preprocessor.get_feature_names_out(input_features=input_features)
 
 
 class ClassifierComparison(BasePredictiveMetric):
