@@ -74,9 +74,11 @@ def bin_numeric_column(df: pd.DataFrame, column_name: str, n_bins: int, col_min:
 
 
 @pf.register_dataframe_method
-def sample_from_binned_column(df: pd.DataFrame, column_name: str, numeric_type='int', mean=None, std=None):
+def sample_from_binned_column(df: pd.DataFrame, column_name: str, numeric_type='int', mean=None, std=None, random_state=None):
     """Reverse the binning of a numeric column, by sampling from the bin ranges. If mean and standard
     deviation of column are given, then sample from truncated normal, else take the uniform distribution"""
+    np.random.seed(random_state)
+
     if numeric_type not in ['int', 'float']:
         raise ValueError("Numeric type must be 'int' or 'float'")
     df = df.copy()
@@ -96,7 +98,7 @@ def sample_from_binned_column(df: pd.DataFrame, column_name: str, numeric_type='
         upp = (upper_bound - mean) / std
         X = truncnorm(low, upp, loc=mean, scale=std)
 
-        sampled_values = X.rvs()
+        sampled_values = X.rvs(random_state=random_state)
         if numeric_type == 'int':
             sampled_values = np.around(sampled_values, decimals=0).astype(int)
         df.loc[~mask_missing, column_name] = sampled_values
